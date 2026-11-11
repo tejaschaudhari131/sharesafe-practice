@@ -10,7 +10,6 @@
     "test:e2e": "playwright test",
     "typecheck": "tsc"
   },
-  "license": "MIT",
   "type": "module",
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",

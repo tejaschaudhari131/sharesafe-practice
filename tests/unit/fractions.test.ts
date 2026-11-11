@@ -39,7 +39,7 @@ describe('problem generation', () => {
           expect(full.d).toBeGreaterThan(base.d);
         } else if (skill === 'addsub') {
           const [a, op, b] = p.parts as [Frac, string, Frac];
-          expect(a.d).not.toBe(b.d); // unlike denominators, as in OpenStax 4.6
+          expect(a.d).not.toBe(b.d); // unlike denominators, as in OpenStax "Add and Subtract Fractions with Different Denominators"
           const ans = (p.answer as { value: Frac }).value;
           const expected = op === '+' ? val(a) + val(b) : val(a) - val(b);
           expect(val(ans)).toBeCloseTo(expected, 10);

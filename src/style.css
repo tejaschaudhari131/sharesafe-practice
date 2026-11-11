@@ -4,7 +4,7 @@ html{font-size:100%}html.lt1{font-size:125%}html.lt2{font-size:150%}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:1rem/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
 main,.top,.foot,.net{max-width:46rem;margin:0 auto;padding:1rem}
-main:focus{outline:none}
+main{min-height:80vh}main:focus{outline:none}
 h1{font-size:1.6rem;line-height:1.25;margin:.5rem 0 1rem}h2{font-size:1.2rem;margin:1rem 0 .5rem}
 a{color:var(--pri)}html.hc a{color:var(--pri)}
 .skip{position:absolute;left:-999px;top:0;background:var(--pri);color:var(--pri-fg);padding:.75rem 1rem;z-index:9}
@@ -18,7 +18,7 @@ button.secondary{background:var(--bg);color:var(--pri)}
 html.hc button.secondary{color:var(--pri);border-color:var(--pri)}
 button.danger{background:var(--bg);color:var(--danger);border-color:var(--danger)}
 button.link{background:none;border-color:transparent;color:var(--pri);text-decoration:underline}
-button[aria-pressed=true]{background:var(--pri);color:var(--pri-fg)}
+button[aria-pressed=true],button.secondary[aria-pressed=true],html.hc button.secondary[aria-pressed=true]{background:var(--pri);color:var(--pri-fg)}
 button[aria-pressed=true]::before{content:"✓ "}
 button:disabled{opacity:.6;cursor:not-allowed}
 :focus-visible{outline:3px solid var(--focus);outline-offset:3px}
@@ -30,7 +30,7 @@ label{display:block;font-weight:600;margin:.5rem 0 .25rem}
 label.check,label.radio{display:flex;align-items:center;font-weight:400;min-height:44px}
 fieldset{border:2px solid var(--line);border-radius:.4rem;margin:.75rem 0;padding:.5rem 1rem 1rem}
 legend{font-weight:700;padding:0 .3rem}
-.frac-in{display:grid;grid-template-columns:auto auto;gap:.25rem .75rem;align-items:center}
+.frac-in{display:grid;grid-template-columns:max-content max-content;gap:.25rem .75rem;align-items:center}
 .frac-in label{margin:0}
 .sym{display:inline-block;width:1.5em;text-align:center;font-weight:700;font-size:1.3em}
 .card{background:var(--card);border:1px solid var(--line);border-radius:.5rem;padding:.5rem 1rem;margin:1.25rem 0}
@@ -55,7 +55,7 @@ table{border-collapse:collapse;width:100%;margin:1rem 0}
 caption{text-align:left;font-weight:700;padding:.25rem 0}
 th,td{border:1px solid var(--line);padding:.4rem .6rem;text-align:left}
 .net{background:var(--card);border:2px solid var(--line);border-radius:.4rem;font-weight:700}
-.foot{border-top:1px solid var(--line);margin-top:2rem;color:var(--muted)}
+.foot{border-top:1px solid var(--line);margin-top:2rem;color:var(--muted)}.foot p{min-height:3em}
 .plan li{margin:.25rem 0}
 details summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weight:600}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
