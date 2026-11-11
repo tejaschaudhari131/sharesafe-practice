@@ -1,0 +1,142 @@
+1
+00:00:00,000 --> 00:00:05,728
+Seventeen percent of U.S. teens say they
+often or sometimes can't finish homework
+
+2
+00:00:05,778 --> 00:00:09,283
+because they lack reliable computer or
+internet access.
+
+3
+00:00:09,333 --> 00:00:11,950
+That's from Pew Research Center, 2018.
+
+4
+00:00:12,000 --> 00:00:16,397
+ShareSafe Practice is fractions practice
+for students like Maya, a seventh grader
+on
+
+5
+00:00:16,447 --> 00:00:19,476
+a library computer with an old phone at
+home.
+
+6
+00:00:19,526 --> 00:00:24,608
+No account, no name, and nothing saved
+after she closes the tab, unless she
+chooses
+
+7
+00:00:24,658 --> 00:00:24,950
+to.
+
+8
+00:00:25,000 --> 00:00:29,424
+Everything works from the keyboard.
+
+9
+00:00:29,474 --> 00:00:33,897
+Start with a six-question pre-check.
+
+10
+00:00:33,947 --> 00:00:41,950
+No hints here, it just shows where you
+begin.
+
+11
+00:00:42,000 --> 00:00:51,950
+In practice, every problem has three hints
+that build step by step, a fraction bar
+
+12
+00:00:52,000 --> 00:00:55,283
+model, and full worked steps.
+
+13
+00:00:55,333 --> 00:01:03,283
+The method follows OpenStax Prealgebra,
+but every problem is original and
+generated
+
+14
+00:01:03,333 --> 00:01:07,950
+by code, so there's always another one.
+
+15
+00:01:08,000 --> 00:01:15,318
+Students can make the text bigger, switch
+to high contrast, or turn on plain
+
+16
+00:01:15,368 --> 00:01:20,582
+language, which rewrites every instruction
+and hint in simpler words.
+
+17
+00:01:20,632 --> 00:01:27,950
+Read aloud speaks the problem, and screen
+readers hear fractions as three over four.
+
+18
+00:01:28,000 --> 00:01:35,807
+Before leaving the library, Maya gets her
+resume code, or scans the QR with her
+
+19
+00:01:35,857 --> 00:01:36,331
+phone.
+
+20
+00:01:36,381 --> 00:01:41,569
+Her progress moves over with no account
+and no server.
+
+21
+00:01:41,619 --> 00:01:44,712
+The last two characters catch typos.
+
+22
+00:01:44,762 --> 00:01:49,950
+They don't stop forgery, and the app says
+so honestly.
+
+23
+00:01:50,000 --> 00:01:58,814
+The whole app is about eighteen kilobytes
+and is cached after one visit.
+
+24
+00:01:58,864 --> 00:02:04,950
+So at home, with no internet, it still
+works.
+
+25
+00:02:05,000 --> 00:02:12,298
+On the shared computer, End session wipes
+everything the app stored, including the
+
+26
+00:02:12,348 --> 00:02:17,950
+offline copy if she wants, and confirms
+what it removed.
+
+27
+00:02:18,000 --> 00:02:20,719
+Then the post-check shows her growth.
+
+28
+00:02:20,769 --> 00:02:26,719
+Lighthouse scores a hundred in every
+category, axe finds no violations, and
+real
+
+29
+00:02:26,769 --> 00:02:29,027
+screen reader testing is next.
+
+30
+00:02:29,077 --> 00:02:29,950
+ShareSafe Practice.
