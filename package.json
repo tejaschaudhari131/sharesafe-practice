@@ -1,0 +1,28 @@
+{
+  "name": "sharesafe-practice",
+  "version": "0.1.0",
+  "description": "Offline-first, privacy-preserving fractions practice PWA for shared and low-end devices.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build && node scripts/gen-sw.mjs",
+    "preview": "serve -s dist -l 4173",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc"
+  },
+  "license": "MIT",
+  "type": "module",
+  "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.65.0",
+    "lighthouse": "^13.6.0",
+    "serve": "^14.2.7",
+    "typescript": "^7.0.2",
+    "vite": "^6.4.6",
+    "vitest": "^5.1.0"
+  },
+  "dependencies": {
+    "qrcode-generator": "^2.0.4"
+  },
+  "private": true
+}
