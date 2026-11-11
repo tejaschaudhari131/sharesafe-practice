@@ -83,16 +83,16 @@ function applySettings() {
 }
 
 // ---------- views ----------
-function show(name: string, html: string) {
+function show(name: string, html: string, focus = true) {
   view = name;
   if (canSpeak) speechSynthesis.cancel();
   main.innerHTML = html;
   const h = $('h1, h2', main);
-  if (h) { h.tabIndex = -1; h.focus(); }
+  if (h) { h.tabIndex = -1; if (focus) h.focus(); } // not on first load, so the skip link stays the first Tab stop
   document.title = `${h?.textContent ?? 'ShareSafe Practice'} · ShareSafe Practice`;
 }
 
-function home() {
+function home(focus = true) {
   const started = progress.preCount > 0 || progress.stage > 0;
   show('home', `
     <h1>${T('Practice fractions, privately', 'Practice fractions. No sign-up.')}</h1>
@@ -113,7 +113,7 @@ function home() {
         ${T('Save progress on this device (only on your own device)', 'Remember me on this device (only if it is your own)')}</label>
       <p class="hint-text">${T('Off by default. When off, nothing is kept after you close this tab. Use “End session” to wipe it right away. Your resume code lets you continue anywhere.',
         'This is off unless you turn it on. When off, closing the tab forgets everything. Press “End session” to forget right now. Your code lets you keep going on another device.')}</p>
-    </section>`);
+    </section>`, focus);
   $('#save-device', main).addEventListener('change', (e) => {
     settings.saveOnDevice = (e.target as HTMLInputElement).checked; persist(); applySettings();
   });
@@ -226,7 +226,7 @@ function practice() {
     if (hintLevel >= p.hints.length) return;
     hintLevel++;
     progress.hints = Math.min(63, progress.hints + 1); persist();
-    help.innerHTML = `<h2>${T('Hints', 'Help')}</h2>` + (hintLevel === 1 ? barsHTML(p) : barsHTML(p)) +
+    help.innerHTML = `<h2>${T('Hints', 'Help')}</h2>` + barsHTML(p) +
       `<ol class="hints">${p.hints.slice(0, hintLevel).map((h) => `<li>${mathText(tx(h))}</li>`).join('')}</ol>` +
       speakBtn(tx(p.hints[hintLevel - 1]), T('Read this hint', 'Read help out loud'));
     if (hintLevel >= p.hints.length) { hintBtn.disabled = true; hintBtn.textContent = T('No more hints', 'No more help'); }
@@ -391,10 +391,10 @@ function go(where: string) {
   switch (where) {
     case 'home': return home();
     case 'start': progress = newProgress(); persist(); return check('pre');
-    case 'continue': return view === 'home' || view === 'restored' || view === 'code' || view === 'end' ? cont() : cont();
+    case 'continue': return cont();
     case 'restore': return restoreView();
     case 'begin-practice': progress.stage = 1; persist(); return practice();
-    case 'practice': if (progress.stage === 3 || progress.stage === 0) { if (progress.stage === 0) progress.stage = 1; } persist(); return practice();
+    case 'practice': if (progress.stage === 0) progress.stage = 1; persist(); return practice();
     case 'post': progress.stage = 2; persist(); return progress.postCount >= CHECK_LEN ? results() : check('post');
     case 'code': return codeView();
     case 'end': return endView();
@@ -441,4 +441,4 @@ const m = location.hash.match(/^#r=([0-9A-Za-z-]+)$/);
 if (m) {
   history.replaceState(null, '', location.pathname + location.search); // don't leave the code in the address bar
   restoreView(normalizeInput(m[1]));
-} else home();
+} else home(false);
