@@ -1,13 +1,27 @@
 // Storage with a "leave no trace" mode. In no-trace mode (default) progress lives in
 // sessionStorage only; "Save on this device" uses localStorage. endSession() wipes
 // everything this app could have written.
+import type { Lang, Pack } from './pack';
 import type { Progress } from './resume';
 
-export interface Settings { largeText: 0 | 1 | 2; contrast: boolean; plain: boolean; saveOnDevice: boolean }
-export const defaultSettings = (): Settings => ({ largeText: 0, contrast: false, plain: false, saveOnDevice: false });
+export interface Settings {
+  largeText: 0 | 1 | 2;
+  contrast: boolean;
+  plain: boolean;
+  saveOnDevice: boolean;
+  lang: Lang;
+}
+export const defaultSettings = (): Settings => ({
+  largeText: 0, contrast: false, plain: false, saveOnDevice: false, lang: 'en',
+});
 
-const KEY = 'sharesafe:v1';
-interface Saved { settings: Settings; progress: Progress | null }
+const KEY = 'sharesafe:v2';
+export interface Saved {
+  settings: Settings;
+  packId: string;
+  progress: Progress | null;
+  customPack?: Pack;
+}
 
 export function load(): Saved | null {
   for (const store of [safe(() => localStorage), safe(() => sessionStorage)]) {
@@ -17,8 +31,8 @@ export function load(): Saved | null {
   return null;
 }
 
-export function save(settings: Settings, progress: Progress | null) {
-  const data = JSON.stringify({ settings, progress });
+export function save(settings: Settings, packId: string, progress: Progress | null, customPack?: Pack | null) {
+  const data = JSON.stringify({ settings, packId, progress, customPack: customPack || undefined } satisfies Saved);
   const ls = safe(() => localStorage), ss = safe(() => sessionStorage);
   if (settings.saveOnDevice) { safe(() => ls?.setItem(KEY, data)); safe(() => ss?.removeItem(KEY)); }
   else { safe(() => ss?.setItem(KEY, data)); safe(() => ls?.removeItem(KEY)); }

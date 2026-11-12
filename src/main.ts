@@ -1,58 +1,87 @@
 import './style.css';
-import { CHECK_LEN, SKILLS, answerText, checkProblem, generate, grade, type FracSlot, type Problem, type Skill, type Text } from './fractions';
+import { t, type StrKey } from './i18n';
+import {
+  CATALOG, catalogEntry, decodePackHash, hasLocale, isGenerated, packHash, pickText, practiceItems,
+  type AccessLevel, type BuiltinId, type Item, type Lang, type LText, type Pack, type RoleId,
+  validatePack,
+} from './pack';
+import { gradeItem } from './grade';
 import { decode, encode, newProgress, normalizeInput, type Progress } from './resume';
 import { defaultSettings, endSession, load, save, type Settings } from './storage';
 
 // ---------- state ----------
 const saved = load();
 let settings: Settings = { ...defaultSettings(), ...(saved?.settings ?? {}) };
-let progress: Progress = saved?.progress ?? newProgress();
-let skill: Skill = 'equiv';
+if (settings.lang !== 'es') settings.lang = 'en';
+let packId: string = saved?.packId && (catalogEntry(saved.packId) || saved.customPack?.id === saved.packId)
+  ? saved.packId : 'permission';
+let customPack: Pack | null = saved?.customPack ?? null;
+let pack: Pack | null = customPack && customPack.id === packId ? customPack : null;
+let progress: Progress = saved?.progress ?? newProgress(packHash({ id: packId }));
+let skill = '';
 let hintLevel = 0;
 let answered = false;
 let view = 'home';
-
-const SKILL_NAME: Record<Skill, Text> = {
-  equiv: { std: 'Equivalent fractions', plain: 'Same amount, different numbers' },
-  addsub: { std: 'Add & subtract', plain: 'Add and take away' },
-  compare: { std: 'Compare fractions', plain: 'Which is bigger?' },
-};
-const STAGE_TARGET = 3; // correct answers per skill before we suggest the post-check
+let pendingRestore = '';
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string, root: ParentNode = document) => root.querySelector(sel) as T;
 const main = $('#main');
-const tx = (t: Text) => (settings.plain ? t.plain : t.std);
-const T = (std: string, plain: string) => (settings.plain ? plain : std);
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+const lang = () => settings.lang;
+const plain = () => settings.plain;
+const T = (key: StrKey, vars?: Record<string, string | number>) => t(key, lang(), plain(), vars);
+const tx = (text: LText) => pickText(text, lang(), plain());
+const bitsCount = (m: number) => { let c = 0; while (m) { c += m & 1; m >>= 1; } return c; };
 
-function persist() { save(settings, progress); }
+function persist() { save(settings, packId, progress, customPack); }
 
-// ---------- math rendering ----------
-function fracHTML(f: FracSlot): string {
-  const sayPart = (v: number | '?') => (v === '?' ? 'blank' : String(v));
-  return `<span class="frac"><span class="sr-only">${sayPart(f.n)} over ${sayPart(f.d)}</span>` +
-    `<span class="fv" aria-hidden="true"><span class="num${f.n === '?' ? ' q' : ''}">${f.n}</span><span class="den${f.d === '?' ? ' q' : ''}">${f.d}</span></span></span>`;
+const packCache: Partial<Record<BuiltinId, Pack>> = {};
+async function loadBuiltin(id: BuiltinId): Promise<Pack> {
+  if (!packCache[id]) packCache[id] = await catalogEntry(id)!.load();
+  return packCache[id]!;
 }
-/** Escape text, then show "a/b" as stacked fractions (with spoken "a over b"). */
-function mathText(s: string): string {
-  return esc(s).replace(/(\d+)\/(\d+)/g, (_, n, d) => fracHTML({ n: +n, d: +d }));
+async function ensurePack(id = packId): Promise<Pack> {
+  if (customPack && customPack.id === id) { pack = customPack; packId = id; return pack; }
+  const entry = catalogEntry(id);
+  if (!entry) throw new Error('unknown pack');
+  pack = await loadBuiltin(entry.id);
+  packId = pack.id;
+  return pack;
 }
-function problemHTML(p: Problem): string {
-  const sym: Record<string, string> = { '+': 'plus', '−': 'minus', '=': 'equals' };
-  return `<p class="math">` + p.parts.map((x) => {
-    if (typeof x === 'string') return `<span class="op"><span aria-hidden="true">${esc(x)}</span><span class="sr-only">${sym[x] ?? x}</span></span>`;
-    if ('blank' in x) return `<span class="blank"><span aria-hidden="true">?</span><span class="sr-only">blank</span></span>`;
-    return fracHTML(x);
-  }).join('') + `</p>`;
+function currentHash(): number {
+  if (customPack && customPack.id === packId) return packHash(customPack);
+  return packHash({ id: packId });
 }
-function barsHTML(p: Problem): string {
-  if (!p.bars) return '';
-  return `<div class="bars">` + p.bars.map((f) => {
-    const w = 240, h = 28, cw = w / f.d;
-    let cells = '';
-    for (let i = 0; i < f.d; i++) cells += `<rect x="${i * cw}" y="0" width="${cw}" height="${h}" class="${i < f.n ? 'on' : 'off'}"/>`;
-    return `<svg viewBox="-1 -1 ${w + 2} ${h + 2}" width="${w}" height="${h}" role="img" aria-label="Bar split into ${f.d} equal parts, ${f.n} shaded (${f.n} over ${f.d})" focusable="false">${cells}</svg>`;
-  }).join('') + `</div>`;
+function skillIndex(p: Pack, id: string) {
+  const i = p.skills.findIndex((s) => s.id === id);
+  return i < 0 ? 0 : Math.min(2, i);
+}
+
+// ---------- chrome / settings ----------
+function applySettings() {
+  const root = document.documentElement;
+  root.lang = settings.lang;
+  root.classList.toggle('lt1', settings.largeText === 1);
+  root.classList.toggle('lt2', settings.largeText === 2);
+  root.classList.toggle('hc', settings.contrast);
+  const sizeName = [T('sizeNormal'), T('sizeLarge'), T('sizeXL')][settings.largeText];
+  $('#t-size').textContent = `${T('textSize')}: ${sizeName}`;
+  $('#t-contrast').textContent = T('contrast');
+  $('#t-contrast').setAttribute('aria-pressed', String(settings.contrast));
+  $('#t-plain').textContent = T('plain');
+  $('#t-plain').setAttribute('aria-pressed', String(settings.plain));
+  const langBtn = $('#t-lang');
+  langBtn.textContent = T('langBtn');
+  langBtn.lang = settings.lang;
+  langBtn.setAttribute('aria-label', T('langSwitchTo'));
+  $('.skip').textContent = T('skip');
+  $('.toolbar').setAttribute('aria-label', settings.lang === 'es'
+    ? 'Opciones de pantalla, idioma y lectura' : 'Display, language and reading options');
+  $('#f-code').textContent = T('resumeCode');
+  $('#f-end').textContent = T('endSession');
+  $('#f-builder').textContent = T('builderLink');
+  $('#f-about').textContent = T('about');
+  $('#mode-status').textContent = settings.saveOnDevice ? T('savingOn') : T('noTrace');
 }
 
 // ---------- speech ----------
@@ -60,27 +89,15 @@ const canSpeak = 'speechSynthesis' in window && typeof SpeechSynthesisUtterance 
 function speak(text: string) {
   if (!canSpeak) return;
   speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text.replace(/(\d+)\/(\d+)/g, '$1 over $2').replace(/−/g, ' minus ').replace(/×/g, ' times '));
+  const u = new SpeechSynthesisUtterance(
+    text.replace(/(\d+)\/(\d+)/g, (_, n, d) => `${n} ${T('overWord')} ${d}`).replace(/−/g, ` ${T('minusWord')} `).replace(/×/g, ' × '),
+  );
   u.rate = 0.9;
+  u.lang = settings.lang === 'es' ? 'es' : 'en';
   speechSynthesis.speak(u);
 }
-const speakBtn = (text: string, label = 'Read aloud') =>
-  canSpeak ? `<button type="button" class="secondary speak" data-speak="${esc(text)}"><span aria-hidden="true">🔊</span> ${label}</button>` : '';
-
-// ---------- settings ----------
-function applySettings() {
-  const root = document.documentElement;
-  root.classList.toggle('lt1', settings.largeText === 1);
-  root.classList.toggle('lt2', settings.largeText === 2);
-  root.classList.toggle('hc', settings.contrast);
-  const sizeName = ['Normal', 'Large', 'Extra large'][settings.largeText];
-  $('#t-size').textContent = `Text size: ${sizeName}`;
-  $('#t-contrast').setAttribute('aria-pressed', String(settings.contrast));
-  $('#t-plain').setAttribute('aria-pressed', String(settings.plain));
-  $('#mode-status').textContent = settings.saveOnDevice
-    ? 'Saving progress on this device.'
-    : 'Leave-no-trace mode: progress is kept only in this tab.';
-}
+const speakBtn = (text: string, label?: string) =>
+  canSpeak ? `<button type="button" class="secondary speak" data-speak="${esc(text)}"><span aria-hidden="true">🔊</span> ${label ?? T('readAloud')}</button>` : '';
 
 // ---------- views ----------
 function show(name: string, html: string, focus = true) {
@@ -88,211 +105,560 @@ function show(name: string, html: string, focus = true) {
   if (canSpeak) speechSynthesis.cancel();
   main.innerHTML = html;
   const h = $('h1, h2', main);
-  if (h) { h.tabIndex = -1; if (focus) h.focus(); } // not on first load, so the skip link stays the first Tab stop
-  document.title = `${h?.textContent ?? 'ShareSafe Practice'} · ShareSafe Practice`;
+  if (h) { h.tabIndex = -1; if (focus) h.focus(); }
+  document.title = `${h?.textContent ?? T('appName')} · ${T('appName')}`;
+}
+
+function contentLangNote(p: Pack): string {
+  const sample = p.pre[0]?.prompt ?? p.intro?.title;
+  if (settings.lang === 'es' && (isGenerated(p.practice) || (sample && !hasLocale(sample, 'es')))) {
+    return `<p class="hint-text" role="note">${esc(T('contentInEn'))}</p>`;
+  }
+  return '';
 }
 
 function home(focus = true) {
-  const started = progress.preCount > 0 || progress.stage > 0;
+  const h = currentHash();
+  const started = progress.packHash === h && (progress.preCount > 0 || progress.stage > 0);
+  const packs = [
+    ...CATALOG.map((c) => ({ id: c.id, title: tx(c.title), desc: tx(c.description) })),
+    ...(customPack ? [{ id: customPack.id, title: `${tx(customPack.title)} (${T('customPack')})`, desc: tx(customPack.description) }] : []),
+  ];
   show('home', `
-    <h1>${T('Practice fractions, privately', 'Practice fractions. No sign-up.')}</h1>
-    <p>${T('Short lessons with hints and worked steps. No account, no name, no tracking. Works offline once loaded.',
-        'Short practice with hints. You do not need an account. We do not ask your name. It works without internet after it loads.')}</p>
-    <ol class="plan">
-      <li>${T('Quick 6-question pre-check', 'A short quiz first (6 questions)')}</li>
-      <li>${T('Practice with hints and worked steps', 'Practice, with help when you want it')}</li>
-      <li>${T('Post-check to see how much you improved', 'A short quiz at the end to see how you grew')}</li>
-    </ol>
+    <h1>${esc(T('homeTitle'))}</h1>
+    <p>${esc(T('homeLead'))}</p>
+    <ol class="plan"><li>${esc(T('plan1'))}</li></ol>
+    <fieldset class="packs">
+      <legend>${esc(T('choosePack'))}</legend>
+      ${packs.map((p) => `<label class="pack"><input type="radio" name="pack" value="${esc(p.id)}" ${p.id === packId ? 'checked' : ''}>
+        <span><span class="pack-title">${esc(p.title)}</span><span class="pack-desc">${esc(p.desc)}</span></span></label>`).join('')}
+    </fieldset>
+    ${customPack ? `<p class="hint-text">${esc(T('packLoaded'))}: ${esc(tx(customPack.title))}</p>` : ''}
     <div class="row">
-      <button type="button" data-go="${started ? 'continue' : 'start'}">${started ? T('Continue', 'Keep going') : T('Start the pre-check', 'Start')}</button>
-      <button type="button" class="secondary" data-go="restore">${T('I have a resume code', 'I have a code')}</button>
+      <button type="button" data-go="${started ? 'continue' : 'start'}">${started ? esc(T('continue')) : esc(T('start'))}</button>
+      <button type="button" class="secondary" data-go="restore">${esc(T('haveCode'))}</button>
     </div>
+    <div class="row">
+      <label class="check" for="pack-file">${esc(T('importPack'))}</label>
+      <input id="pack-file" type="file" accept="application/json,.json">
+      <button type="button" class="link" data-go="builder">${esc(T('builderLink'))}</button>
+    </div>
+    <p id="import-err" role="alert"></p>
     <section aria-labelledby="privacy-h" class="card">
-      <h2 id="privacy-h">${T('Privacy on shared computers', 'Using a shared computer?')}</h2>
+      <h2 id="privacy-h">${esc(T('privacyH'))}</h2>
       <label class="check"><input type="checkbox" id="save-device" ${settings.saveOnDevice ? 'checked' : ''}>
-        ${T('Save progress on this device (only on your own device)', 'Remember me on this device (only if it is your own)')}</label>
-      <p class="hint-text">${T('Off by default. When off, nothing is kept after you close this tab. Use “End session” to wipe it right away. Your resume code lets you continue anywhere.',
-        'This is off unless you turn it on. When off, closing the tab forgets everything. Press “End session” to forget right now. Your code lets you keep going on another device.')}</p>
+        ${esc(T('saveDevice'))}</label>
+      <p class="hint-text">${esc(T('saveHint'))}</p>
     </section>`, focus);
   $('#save-device', main).addEventListener('change', (e) => {
     settings.saveOnDevice = (e.target as HTMLInputElement).checked; persist(); applySettings();
   });
+  main.querySelectorAll('input[name=pack]').forEach((el) => {
+    el.addEventListener('change', () => {
+      packId = (el as HTMLInputElement).value;
+      pack = (customPack && customPack.id === packId) ? customPack : null;
+      persist();
+      home(false);
+    });
+  });
+  $('#pack-file', main).addEventListener('change', async (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    try {
+      const raw = JSON.parse(await file.text());
+      const r = validatePack(raw);
+      if (!r.ok) {
+        $('#import-err', main).textContent = r.errors.map((er) => `${er.path}: ${er.message}`).join(' ');
+        return;
+      }
+      customPack = r.pack; packId = r.pack.id; pack = r.pack; persist(); home();
+    } catch {
+      $('#import-err', main).textContent = T('importErr');
+    }
+  });
+}
+
+async function withPack(fn: (p: Pack) => void | Promise<void>) {
+  try {
+    show(view, `<h1>${esc(T('packingWait'))}</h1>`, false);
+    const p = await ensurePack();
+    await fn(p);
+  } catch {
+    show('error', `<h1>${esc(T('packFail'))}</h1><div class="row"><button type="button" data-go="home">${esc(T('back'))}</button></div>`);
+  }
 }
 
 function cont() {
-  if (progress.stage === 0) return progress.preCount >= CHECK_LEN ? preDone() : check('pre');
-  if (progress.stage === 1) return practice();
-  if (progress.stage === 2) return progress.postCount >= CHECK_LEN ? results() : check('post');
-  return results();
+  void withPack((p) => {
+    if (progress.stage === 0) return progress.preCount >= p.checkLength ? preDone(p) : check(p, 'pre');
+    if (progress.stage === 1) return practice(p);
+    if (progress.stage === 2) return progress.postCount >= p.checkLength ? results(p) : check(p, 'post');
+    return results(p);
+  });
 }
 
-// ----- answer form shared by checks and practice -----
-function answerForm(p: Problem, submitLabel: string): string {
+// ---------- fractions rendering (lazy module) ----------
+type FracMod = typeof import('./fractions');
+let fracMod: FracMod | null = null;
+async function fractions(): Promise<FracMod> {
+  if (!fracMod) fracMod = await import('./fractions');
+  return fracMod;
+}
+
+function fracHTML(f: { n: number | '?'; d: number | '?' }): string {
+  const sayPart = (v: number | '?') => (v === '?' ? T('blankWord') : String(v));
+  return `<span class="frac"><span class="sr-only">${sayPart(f.n)} ${T('overWord')} ${sayPart(f.d)}</span>` +
+    `<span class="fv" aria-hidden="true"><span class="num${f.n === '?' ? ' q' : ''}">${f.n}</span><span class="den${f.d === '?' ? ' q' : ''}">${f.d}</span></span></span>`;
+}
+function mathText(s: string): string {
+  return esc(s).replace(/(\d+)\/(\d+)/g, (_, n, d) => fracHTML({ n: +n, d: +d }));
+}
+function problemHTML(p: FracMod['generate'] extends (...a: never) => infer R ? R : never): string {
+  const sym: Record<string, string> = { '+': T('plusWord'), '−': T('minusWord'), '=': T('equalsWord') };
+  return `<p class="math">` + p.parts.map((x) => {
+    if (typeof x === 'string') return `<span class="op"><span aria-hidden="true">${esc(x)}</span><span class="sr-only">${sym[x] ?? x}</span></span>`;
+    if ('blank' in x) return `<span class="blank"><span aria-hidden="true">?</span><span class="sr-only">${esc(T('blankWord'))}</span></span>`;
+    return fracHTML(x);
+  }).join('') + `</p>`;
+}
+function barsHTML(p: { bars?: { n: number; d: number }[] }): string {
+  if (!p.bars) return '';
+  return `<div class="bars">` + p.bars.map((f) => {
+    const w = 240, h = 28, cw = w / f.d;
+    let cells = '';
+    for (let i = 0; i < f.d; i++) cells += `<rect x="${i * cw}" y="0" width="${cw}" height="${h}" class="${i < f.n ? 'on' : 'off'}"/>`;
+    return `<svg viewBox="-1 -1 ${w + 2} ${h + 2}" width="${w}" height="${h}" role="img" aria-label="${esc(T('barLabel', { d: f.d, n: f.n }))}" focusable="false">${cells}</svg>`;
+  }).join('') + `</div>`;
+}
+
+function answerFormFrac(kind: 'int' | 'frac' | 'cmp', submitLabel: string): string {
   let inputs = '';
-  if (p.answer.kind === 'int') {
-    inputs = `<label for="a-int">${T('Missing number', 'The missing number')}</label>
+  if (kind === 'int') {
+    inputs = `<label for="a-int">${esc(T('missingNumber'))}</label>
       <input id="a-int" name="int" inputmode="numeric" autocomplete="off" required>`;
-  } else if (p.answer.kind === 'frac') {
-    inputs = `<fieldset><legend>${T('Your answer as a fraction', 'Your answer')}</legend>
+  } else if (kind === 'frac') {
+    inputs = `<fieldset><legend>${esc(T('yourFrac'))}</legend>
       <div class="frac-in">
-        <label for="a-n">${T('Numerator (top)', 'Top number')}</label><input id="a-n" name="n" inputmode="numeric" autocomplete="off" required>
-        <label for="a-d">${T('Denominator (bottom)', 'Bottom number')}</label><input id="a-d" name="d" inputmode="numeric" autocomplete="off" required>
+        <label for="a-n">${esc(T('numerator'))}</label><input id="a-n" name="n" inputmode="numeric" autocomplete="off" required>
+        <label for="a-d">${esc(T('denominator'))}</label><input id="a-d" name="d" inputmode="numeric" autocomplete="off" required>
       </div></fieldset>`;
   } else {
-    inputs = `<fieldset class="cmp"><legend>${T('Choose the symbol', 'Pick one')}</legend>
+    inputs = `<fieldset class="cmp"><legend>${esc(T('chooseSymbol'))}</legend>
       ${(['<', '>', '='] as const).map((s, i) => `<label class="radio"><input type="radio" name="cmp" value="${s}" ${i === 0 ? 'required' : ''}>
-        <span class="sym" aria-hidden="true">${esc(s)}</span> ${{ '<': 'is less than', '>': 'is greater than', '=': 'is equal to' }[s]}</label>`).join('')}
+        <span class="sym" aria-hidden="true">${esc(s)}</span> ${{ '<': T('isLess'), '>': T('isGreater'), '=': T('isEqual') }[s]}</label>`).join('')}
       </fieldset>`;
   }
-  return `<form id="answer" novalidate>${inputs}<div class="row"><button type="submit">${submitLabel}</button></div>
+  return `<form id="answer" novalidate>${inputs}<div class="row"><button type="submit">${esc(submitLabel)}</button></div>
     <div id="feedback" role="status" aria-live="polite"></div></form>`;
 }
-function readForm(form: HTMLFormElement) {
-  const fd = new FormData(form);
-  return { int: fd.get('int') as string, n: fd.get('n') as string, d: fd.get('d') as string, cmp: fd.get('cmp') as string };
-}
-function spokenProblem(p: Problem) { return `${tx(p.prompt)}. ${p.speech}.`; }
 
-function check(kind: 'pre' | 'post') {
+function choiceForm(item: Item, submitLabel: string): string {
+  const choices = (item.choices ?? []).map((c, i) =>
+    `<label class="radio"><input type="radio" name="choice" value="${esc(c.id)}" ${i === 0 ? 'required' : ''}> ${esc(tx(c.text))}</label>`).join('');
+  return `<form id="answer" novalidate><fieldset><legend>${esc(tx(item.prompt))}</legend>${choices}</fieldset>
+    <div class="row"><button type="submit">${esc(submitLabel)}</button></div>
+    <div id="feedback" role="status" aria-live="polite"></div></form>`;
+}
+
+function roleName(r: RoleId): string {
+  return T(({ you: 'roleYou', group: 'roleGroup', class: 'roleClass', teacher: 'roleTeacher', public: 'rolePublic' } as const)[r]);
+}
+function accessForm(item: Item, submitLabel: string): string {
+  const a = item.access!;
+  const groups = a.roles.map((r) => `<fieldset>
+    <legend>${esc(roleName(r))}</legend>
+    ${(['none', 'view', 'edit'] as const).map((lv, i) => `<label class="radio"><input type="radio" name="${esc(r)}" value="${lv}" ${i === 0 ? 'required' : ''}> ${esc(T(({ none: 'accessNone', view: 'accessView', edit: 'accessEdit' } as const)[lv]))}</label>`).join('')}
+  </fieldset>`).join('');
+  return `<form id="answer" novalidate>
+    <p class="prompt">${esc(tx(item.prompt))}</p>
+    <article class="card">
+      <h2>${esc(tx(a.name))}</h2>
+      <p class="badge" role="note">${esc(T('fictional'))}</p>
+      <p>${esc(tx(a.summary))}</p>
+    </article>
+    <div class="access"><p class="prompt" id="access-h">${esc(T('accessFor'))}</p>${groups}</div>
+    <div class="row"><button type="submit">${esc(submitLabel)}</button></div>
+    <div id="feedback" role="status" aria-live="polite"></div>
+  </form>`;
+}
+
+function messageBlock(item: Item): string {
+  const m = item.message!;
+  return `<article class="mail" aria-label="${esc(T('fictional'))}">
+    <p class="badge" role="note">${esc(T('fictional'))}</p>
+    <p class="mail-meta"><strong>${esc(T('fromLabel'))}:</strong> ${esc(m.from)}</p>
+    <p class="mail-meta"><strong>${esc(T('subjectLabel'))}:</strong> ${esc(tx(m.subject))}</p>
+    <p class="mail-body">${esc(tx(m.body))}</p>
+  </article>`;
+}
+
+function explanationHTML(item: Item): string {
+  let html = '';
+  if (item.explanation) html += `<section class="card" aria-labelledby="exp-h"><h2 id="exp-h">${esc(T('explanationH'))}</h2><p>${esc(tx(item.explanation))}</p></section>`;
+  if (item.flags?.length) html += `<section class="card" aria-labelledby="flags-h"><h2 id="flags-h">${esc(T('flagsH'))}</h2><ul class="flags">${item.flags.map((f) => `<li>${esc(tx(f))}</li>`).join('')}</ul></section>`;
+  return html;
+}
+
+async function check(p: Pack, kind: 'pre' | 'post') {
   const i = kind === 'pre' ? progress.preCount : progress.postCount;
-  const p = checkProblem(progress.seed, i, kind);
-  const title = kind === 'pre' ? T('Pre-check', 'First quiz') : T('Post-check', 'Final quiz');
+  const title = kind === 'pre' ? T('preTitle') : T('postTitle');
+  const len = p.checkLength;
+  if (isGenerated(p.practice)) {
+    const F = await fractions();
+    const problem = F.checkProblem(progress.seed, i, kind);
+    show(kind, `
+      <h1>${esc(title)}: ${esc(T('questionOf'))} ${i + 1} ${esc(T('ofWord'))} ${len}</h1>
+      ${contentLangNote(p)}
+      <progress max="${len}" value="${i}" aria-label="${esc(title)}">${i} of ${len}</progress>
+      <p class="hint-text">${esc(T('noHintsHere'))}</p>
+      <p class="prompt">${esc(plain() ? problem.prompt.plain : problem.prompt.std)}.</p>
+      ${problemHTML(problem)}
+      ${speakBtn(`${plain() ? problem.prompt.plain : problem.prompt.std}. ${problem.speech}.`)}
+      ${answerFormFrac(problem.answer.kind, T('submit'))}`);
+    bindFracCheck(p, kind, problem, F);
+    return;
+  }
+  const item = (kind === 'pre' ? p.pre : p.post)[i];
+  const body = item.kind === 'message' ? messageBlock(item) : '';
+  const spoken = [tx(item.prompt), item.message ? `${T('fromLabel')}: ${item.message.from}. ${tx(item.message.subject)}. ${tx(item.message.body)}` : ''].filter(Boolean).join(' ');
   show(kind, `
-    <h1>${title}: ${T('question', 'question')} ${i + 1} ${T('of', 'of')} ${CHECK_LEN}</h1>
-    <progress max="${CHECK_LEN}" value="${i}" aria-label="${title} progress">${i} of ${CHECK_LEN}</progress>
-    <p class="hint-text">${T('No hints here. Just do your best; this shows where you start.', 'No help in this quiz. Just try your best.')}</p>
-    <p class="prompt">${esc(tx(p.prompt))}.</p>
-    ${problemHTML(p)}
-    ${speakBtn(spokenProblem(p))}
-    ${answerForm(p, T('Submit answer', 'Done'))}`);
+    <h1>${esc(title)}: ${esc(T('questionOf'))} ${i + 1} ${esc(T('ofWord'))} ${len}</h1>
+    ${contentLangNote(p)}
+    <progress max="${len}" value="${i}" aria-label="${esc(title)}">${i} of ${len}</progress>
+    <p class="hint-text">${esc(T('noHintsHere'))}</p>
+    ${item.kind === 'message' ? '' : `<p class="prompt">${esc(tx(item.prompt))}</p>`}
+    ${body}
+    ${speakBtn(spoken)}
+    ${choiceForm(item, T('submit'))}`);
+  bindChoiceCheck(p, kind, item);
+}
+
+function recordCheck(kind: 'pre' | 'post', p: Pack, correct: boolean) {
+  const i = kind === 'pre' ? progress.preCount : progress.postCount;
+  if (kind === 'pre') { if (correct) progress.preMask |= 1 << i; progress.preCount++; }
+  else { if (correct) progress.postMask |= 1 << i; progress.postCount++; }
+  if (kind === 'post' && progress.postCount >= p.checkLength) progress.stage = 3;
+  persist();
+  const done = (kind === 'pre' ? progress.preCount : progress.postCount) >= p.checkLength;
+  if (done) kind === 'pre' ? preDone(p) : results(p); else void check(p, kind);
+}
+
+function bindChoiceCheck(p: Pack, kind: 'pre' | 'post', item: Item) {
   const form = $<HTMLFormElement>('#answer', main);
   form.addEventListener('submit', (e) => {
     e.preventDefault();
-    const g = grade(p, readForm(form));
-    if (g.invalid) { $('#feedback', main).innerHTML = `<p class="warn">${esc(g.invalid)}</p>`; return; }
-    if (kind === 'pre') { if (g.correct) progress.preMask |= 1 << i; progress.preCount++; }
-    else { if (g.correct) progress.postMask |= 1 << i; progress.postCount++; }
-    if (kind === 'post' && progress.postCount >= CHECK_LEN) progress.stage = 3;
-    persist();
-    const done = (kind === 'pre' ? progress.preCount : progress.postCount) >= CHECK_LEN;
-    if (done) kind === 'pre' ? preDone() : results(); else check(kind);
+    const choice = new FormData(form).get('choice') as string;
+    const g = gradeItem(item, { choice });
+    if (g.invalid) { $('#feedback', main).innerHTML = `<p class="warn">${esc(T('pickChoice'))}</p>`; return; }
+    recordCheck(kind, p, g.correct);
   });
 }
 
-const bitsCount = (m: number) => { let c = 0; while (m) { c += m & 1; m >>= 1; } return c; };
-
-function preDone() {
-  const score = bitsCount(progress.preMask);
-  show('predone', `
-    <h1>${T('Pre-check done', 'First quiz done')}</h1>
-    <p class="big">${T('You got', 'You got')} <strong>${score} ${T('of', 'out of')} ${CHECK_LEN}</strong>.</p>
-    <p>${T('That’s your starting point. Now practise each skill with hints and worked steps.', 'That is where you start. Now let’s practice. You can ask for hints.')}</p>
-    <div class="row"><button type="button" data-go="begin-practice">${T('Start practising', 'Start practice')}</button></div>`);
+function bindFracCheck(p: Pack, kind: 'pre' | 'post', problem: Awaited<ReturnType<FracMod['checkProblem']>>, F: FracMod) {
+  const form = $<HTMLFormElement>('#answer', main);
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const g = F.grade(problem, { int: fd.get('int') as string, n: fd.get('n') as string, d: fd.get('d') as string, cmp: fd.get('cmp') as string });
+    if (g.invalid) { $('#feedback', main).innerHTML = `<p class="warn">${esc(localizeInvalid(g.invalid))}</p>`; return; }
+    recordCheck(kind, p, g.correct);
+  });
 }
 
-function practice() {
-  const si = SKILLS.indexOf(skill);
-  const sp = progress.skills[si];
-  const p = generate(skill, progress.seed, sp.attempts, 'practice');
+function localizeInvalid(msg: string): string {
+  if (/whole number\.$/.test(msg) && !/top/.test(msg)) return T('enterWhole');
+  if (/Choose/.test(msg)) return T('chooseCmp');
+  if (/cannot be 0/.test(msg)) return T('denZero');
+  if (/top and the bottom/.test(msg)) return T('enterFrac');
+  return msg;
+}
+
+function introHTML(p: Pack): string {
+  if (!p.intro) return '';
+  const mock = p.intro.mock ? `<div class="mock">
+    <div class="mock-bar"><span class="mock-dots" aria-hidden="true">●●●</span><span>${esc(p.intro.mock.url)}</span></div>
+    <p class="mock-status">${esc(p.intro.mock.status)}</p>
+    <p class="mock-msg">${esc(tx(p.intro.mock.message))}</p>
+  </div>` : '';
+  return `<section aria-labelledby="intro-h">
+    <h2 id="intro-h">${esc(tx(p.intro.title))}</h2>
+    ${mock}
+    ${p.intro.body.map((b) => `<p>${esc(tx(b))}</p>`).join('')}
+  </section>`;
+}
+
+function preDone(p: Pack) {
+  const score = bitsCount(progress.preMask);
+  const spokenIntro = p.intro ? [tx(p.intro.title), ...p.intro.body.map(tx)].join(' ') : '';
+  show('predone', `
+    <h1>${esc(T('preDone'))}</h1>
+    <p class="big">${esc(T('youGot'))} <strong>${score} ${esc(T('ofWord'))} ${p.checkLength}</strong>.</p>
+    <p>${esc(T('preDoneBody'))}</p>
+    ${introHTML(p)}
+    ${p.intro ? speakBtn(spokenIntro, T('readAloud')) : ''}
+    ${p.credit ? `<p class="hint-text">${esc(tx(p.credit))}</p>` : ''}
+    <div class="row"><button type="button" data-go="begin-practice">${esc(p.intro ? T('continueLesson') : T('startPractice'))}</button></div>`);
+}
+
+function practiceReady(p: Pack): boolean {
+  if (isGenerated(p.practice)) return progress.skills.every((s) => s.correct >= p.stageTarget);
+  if (p.skills.length > 1) return p.skills.every((_, i) => progress.skills[i].correct >= p.stageTarget);
+  return progress.skills[0].correct >= Math.min(p.stageTarget, practiceItems(p).length || p.stageTarget);
+}
+
+function currentPracticeItem(p: Pack): Item | null {
+  const items = practiceItems(p);
+  if (!items.length) return null;
+  if (p.skills.length > 1) return items.find((it) => it.skill === skill) ?? items[skillIndex(p, skill)] ?? items[0];
+  const idx = Math.min(progress.skills[0].attempts, items.length - 1);
+  return items[idx];
+}
+
+async function practice(p: Pack) {
+  if (!skill) skill = p.skills[0]?.id ?? '';
+  if (isGenerated(p.practice)) return fracPractice(p);
+  const item = currentPracticeItem(p)!;
   hintLevel = 0; answered = false;
-  const ready = progress.skills.every((s) => s.correct >= STAGE_TARGET);
+  const ready = practiceReady(p);
+  const nextLabel = item.kind === 'access' ? T('nextFile') : item.kind === 'message' ? T('nextMessage') : T('nextProblem');
+  const spoken = item.kind === 'message'
+    ? `${tx(item.prompt)}. ${T('fromLabel')}: ${item.message!.from}. ${tx(item.message!.subject)}. ${tx(item.message!.body)}`
+    : item.kind === 'access'
+      ? `${tx(item.prompt)}. ${tx(item.access!.name)}. ${tx(item.access!.summary)}`
+      : tx(item.prompt);
+  const form = item.kind === 'access' ? accessForm(item, T('checkAns')) : choiceForm(item, T('checkAns'));
   show('practice', `
-    <h1>${T('Practice', 'Practice')}: ${esc(tx(SKILL_NAME[skill]))}</h1>
-    <nav aria-label="${T('Choose a skill', 'Pick what to practice')}" class="skills">
-      ${SKILLS.map((s, k) => `<button type="button" class="secondary" data-skill="${s}" aria-pressed="${s === skill}">
-        ${esc(tx(SKILL_NAME[s]))} <span class="count">(${progress.skills[k].correct} ${T('correct', 'right')})</span></button>`).join('')}
-    </nav>
-    <p class="prompt">${esc(tx(p.prompt))}.</p>
-    ${problemHTML(p)}
-    <div class="row">${speakBtn(spokenProblem(p))}</div>
-    ${answerForm(p, T('Check answer', 'Check'))}
+    <h1>${esc(T('practice'))}: ${esc(tx(p.skills[skillIndex(p, item.skill)]?.name ?? p.title))}</h1>
+    ${contentLangNote(p)}
+    ${skillNav(p)}
+    ${item.kind === 'message' ? messageBlock(item) : ''}
+    <div class="row">${speakBtn(spoken)}</div>
+    ${form}
     <div class="row">
-      <button type="button" class="secondary" id="hint-btn">${T('Show a hint', 'Help me')} (1 ${T('of', 'of')} ${p.hints.length})</button>
-      <button type="button" class="secondary" id="steps-btn">${T('Show worked steps', 'Show me how')}</button>
-      <button type="button" class="secondary" id="next-btn">${T('Next problem', 'Next one')}</button>
+      ${item.hints?.length ? `<button type="button" class="secondary" id="hint-btn">${esc(T('showHint'))} (1 ${esc(T('ofWord'))} ${item.hints.length})</button>` : ''}
+      ${item.steps?.length ? `<button type="button" class="secondary" id="steps-btn">${esc(T('showSteps'))}</button>` : ''}
+      <button type="button" class="secondary" id="next-btn">${esc(nextLabel)}</button>
     </div>
     <section id="help" aria-live="polite"></section>
-    <section class="card" aria-labelledby="next-h">
-      <h2 id="next-h">${T('When you’re ready', 'When you are ready')}</h2>
-      <p>${ready ? T('You’ve got 3+ correct in every skill. Nice! Try the post-check.', 'You got 3 or more right in each part. Great! Try the final quiz.')
-                 : T(`Tip: aim for ${STAGE_TARGET} correct in each skill, then take the post-check.`, `Try to get ${STAGE_TARGET} right in each part. Then take the final quiz.`)}</p>
-      <div class="row"><button type="button" class="${ready ? '' : 'secondary'}" data-go="post">${T('Take the post-check', 'Take the final quiz')}</button>
-      <button type="button" class="secondary" data-go="code">${T('Get my resume code', 'Get my code')}</button></div>
-    </section>`);
+    ${readySection(p, ready)}`);
+  bindPractice(p, item);
+}
 
+function skillNav(p: Pack): string {
+  if (p.skills.length < 2) return '';
+  return `<nav aria-label="${esc(T('chooseSkill'))}" class="skills">
+    ${p.skills.map((s, k) => `<button type="button" class="secondary" data-skill="${esc(s.id)}" aria-pressed="${s.id === skill}">
+      ${esc(tx(s.name))} <span class="count">(${progress.skills[k].correct} ${esc(T('correctWord'))})</span></button>`).join('')}
+  </nav>`;
+}
+function readySection(p: Pack, ready: boolean): string {
+  return `<section class="card" aria-labelledby="next-h">
+    <h2 id="next-h">${esc(T('whenReady'))}</h2>
+    <p>${ready ? esc(T('readyPost')) : esc(T('tipPost'))}</p>
+    <div class="row"><button type="button" class="${ready ? '' : 'secondary'}" data-go="post">${esc(T('takePost'))}</button>
+    <button type="button" class="secondary" data-go="code">${esc(T('getCode'))}</button></div>
+  </section>`;
+}
+
+function bindPractice(p: Pack, item: Item) {
+  const help = $('#help', main);
+  const hintBtn = $('#hint-btn', main) as HTMLButtonElement | null;
+  if (hintBtn && item.hints) {
+    hintBtn.addEventListener('click', () => {
+      if (hintLevel >= item.hints!.length) return;
+      hintLevel++;
+      progress.hints = Math.min(31, progress.hints + 1); persist();
+      help.innerHTML = `<h2>${esc(T('hintsH'))}</h2><ol class="hints">${item.hints!.slice(0, hintLevel).map((h) => `<li>${esc(tx(h))}</li>`).join('')}</ol>` +
+        speakBtn(tx(item.hints![hintLevel - 1]), T('readHint'));
+      if (hintLevel >= item.hints!.length) { hintBtn.disabled = true; hintBtn.textContent = T('noMoreHints'); }
+      else hintBtn.textContent = `${T('showHint')} (${hintLevel + 1} ${T('ofWord')} ${item.hints!.length})`;
+    });
+  }
+  const stepsBtn = $('#steps-btn', main);
+  if (stepsBtn) stepsBtn.addEventListener('click', () => showItemSteps(p, item));
+  $('#next-btn', main).addEventListener('click', () => {
+    if (!answered) advancePractice(p, false);
+    else advancePractice(p, true, true);
+  });
+  const form = $<HTMLFormElement>('#answer', main);
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (answered) return;
+    const fb = $('#feedback', main);
+    const g = gradeItem(item, readItemForm(form, item));
+    if (g.invalid === 'choice') { fb.innerHTML = `<p class="warn">${esc(T('pickChoice'))}</p>`; return; }
+    if (g.invalid === 'roles') { fb.innerHTML = `<p class="warn">${esc(T('setAllRoles'))}</p>`; return; }
+    if (g.correct) {
+      markCorrect(p, item, fb);
+    } else {
+      const note = g.accessNote === 'too-open' ? T('tooOpen') : g.accessNote === 'too-tight' ? T('tooTight') : T('notQuite');
+      fb.innerHTML = `<p class="warn">${esc(note)}</p>`;
+    }
+  });
+}
+
+function readItemForm(form: HTMLFormElement, item: Item): { choice?: string; access?: Partial<Record<RoleId, AccessLevel>> } {
+  const fd = new FormData(form);
+  if (item.kind === 'access' && item.access) {
+    const access: Partial<Record<RoleId, AccessLevel>> = {};
+    for (const r of item.access.roles) access[r] = (fd.get(r) as AccessLevel) || undefined;
+    return { access };
+  }
+  return { choice: (fd.get('choice') as string) || undefined };
+}
+
+function markCorrect(p: Pack, item: Item, fb: HTMLElement) {
+  answered = true;
+  const si = p.skills.length > 1 ? skillIndex(p, item.skill) : 0;
+  const sp = progress.skills[si];
+  sp.attempts = Math.min(31, sp.attempts + 1);
+  sp.correct = Math.min(15, sp.correct + 1);
+  persist();
+  fb.innerHTML = `<p class="ok"><span aria-hidden="true">✓</span> ${esc(T('yesCorrect'))}</p>` + explanationHTML(item);
+  $<HTMLFormElement>('#answer', main).querySelectorAll('input,button[type=submit]').forEach((el) => ((el as HTMLInputElement).disabled = true));
+  const cnt = $(`[data-skill="${item.skill}"] .count`, main); if (cnt) cnt.textContent = `(${sp.correct} ${T('correctWord')})`;
+  $<HTMLButtonElement>('#next-btn', main).focus();
+}
+
+function showItemSteps(p: Pack, item: Item) {
+  const help = $('#help', main);
+  help.innerHTML = `<h2>${esc(T('stepsH'))}</h2>` +
+    (item.steps?.length ? `<ol class="steps">${item.steps.map((s) => `<li>${esc(tx(s))}</li>`).join('')}</ol>` : '') +
+    explanationHTML(item) +
+    (item.steps?.length ? speakBtn(item.steps.map(tx).join(' '), T('readSteps')) : '');
+  if (!answered) {
+    answered = true;
+    const si = p.skills.length > 1 ? skillIndex(p, item.skill) : 0;
+    progress.skills[si].attempts = Math.min(31, progress.skills[si].attempts + 1); persist();
+    $<HTMLFormElement>('#answer', main).querySelectorAll('input,button[type=submit]').forEach((el) => ((el as HTMLInputElement).disabled = true));
+  }
+  $<HTMLButtonElement>('#next-btn', main).focus();
+}
+
+function advancePractice(p: Pack, _wasAnswered: boolean, alreadyCounted = false) {
+  if (p.skills.length > 1) {
+    const i = skillIndex(p, skill);
+    const next = p.skills[(i + 1) % p.skills.length];
+    skill = next.id;
+  } else if (!alreadyCounted && !answered) {
+    progress.skills[0].attempts = Math.min(31, progress.skills[0].attempts + 1);
+    persist();
+  }
+  void practice(p);
+}
+
+async function fracPractice(p: Pack) {
+  const F = await fractions();
+  const skills = F.SKILLS;
+  if (!skills.includes(skill as (typeof skills)[number])) skill = skills[0];
+  const si = skills.indexOf(skill as (typeof skills)[number]);
+  const sp = progress.skills[si];
+  const problem = F.generate(skill as (typeof skills)[number], progress.seed, sp.attempts, 'practice');
+  hintLevel = 0; answered = false;
+  const ready = practiceReady(p);
+  const name = tx(p.skills[si].name);
+  const prompt = plain() ? problem.prompt.plain : problem.prompt.std;
+  show('practice', `
+    <h1>${esc(T('practice'))}: ${esc(name)}</h1>
+    ${contentLangNote(p)}
+    ${skillNav(p)}
+    <p class="prompt">${esc(prompt)}.</p>
+    ${problemHTML(problem)}
+    <div class="row">${speakBtn(`${prompt}. ${problem.speech}.`)}</div>
+    ${answerFormFrac(problem.answer.kind, T('checkAns'))}
+    <div class="row">
+      <button type="button" class="secondary" id="hint-btn">${esc(T('showHint'))} (1 ${esc(T('ofWord'))} ${problem.hints.length})</button>
+      <button type="button" class="secondary" id="steps-btn">${esc(T('showSteps'))}</button>
+      <button type="button" class="secondary" id="next-btn">${esc(T('nextProblem'))}</button>
+    </div>
+    <section id="help" aria-live="polite"></section>
+    ${readySection(p, ready)}`);
   const help = $('#help', main);
   const hintBtn = $<HTMLButtonElement>('#hint-btn', main);
   hintBtn.addEventListener('click', () => {
-    if (hintLevel >= p.hints.length) return;
+    if (hintLevel >= problem.hints.length) return;
     hintLevel++;
-    progress.hints = Math.min(63, progress.hints + 1); persist();
-    help.innerHTML = `<h2>${T('Hints', 'Help')}</h2>` + barsHTML(p) +
-      `<ol class="hints">${p.hints.slice(0, hintLevel).map((h) => `<li>${mathText(tx(h))}</li>`).join('')}</ol>` +
-      speakBtn(tx(p.hints[hintLevel - 1]), T('Read this hint', 'Read help out loud'));
-    if (hintLevel >= p.hints.length) { hintBtn.disabled = true; hintBtn.textContent = T('No more hints', 'No more help'); }
-    else hintBtn.textContent = `${T('Show a hint', 'Help me')} (${hintLevel + 1} ${T('of', 'of')} ${p.hints.length})`;
+    progress.hints = Math.min(31, progress.hints + 1); persist();
+    const ht = problem.hints.slice(0, hintLevel).map((h) => plain() ? h.plain : h.std);
+    help.innerHTML = `<h2>${esc(T('hintsH'))}</h2>` + barsHTML(problem) +
+      `<ol class="hints">${ht.map((h) => `<li>${mathText(h)}</li>`).join('')}</ol>` +
+      speakBtn(ht[hintLevel - 1], T('readHint'));
+    if (hintLevel >= problem.hints.length) { hintBtn.disabled = true; hintBtn.textContent = T('noMoreHints'); }
+    else hintBtn.textContent = `${T('showHint')} (${hintLevel + 1} ${T('ofWord')} ${problem.hints.length})`;
   });
-  $('#steps-btn', main).addEventListener('click', () => showSteps(p));
+  $('#steps-btn', main).addEventListener('click', () => {
+    const steps = problem.steps.map((s) => plain() ? s.plain : s.std);
+    help.innerHTML = `<h2>${esc(T('stepsH'))}</h2>${barsHTML(problem)}
+      <ol class="steps">${steps.map((s) => `<li>${mathText(s)}</li>`).join('')}</ol>
+      <p>${esc(T('answerWord'))}: <strong>${mathText(F.answerText(problem.answer))}</strong></p>
+      ${speakBtn(steps.join(' '), T('readSteps'))}`;
+    if (!answered) {
+      answered = true;
+      sp.attempts = Math.min(31, sp.attempts + 1); persist();
+      $<HTMLFormElement>('#answer', main).querySelectorAll('input,button[type=submit]').forEach((el) => ((el as HTMLInputElement).disabled = true));
+    }
+    $<HTMLButtonElement>('#next-btn', main).focus();
+  });
   $('#next-btn', main).addEventListener('click', () => {
-    if (!answered) { progress.skills[si].attempts = Math.min(63, sp.attempts + 1); persist(); }
-    practice();
+    if (!answered) { progress.skills[si].attempts = Math.min(31, sp.attempts + 1); persist(); }
+    void practice(p);
   });
   const form = $<HTMLFormElement>('#answer', main);
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const fb = $('#feedback', main);
     if (answered) return;
-    const g = grade(p, readForm(form));
-    if (g.invalid) { fb.innerHTML = `<p class="warn">${esc(g.invalid)}</p>`; return; }
+    const fd = new FormData(form);
+    const g = F.grade(problem, { int: fd.get('int') as string, n: fd.get('n') as string, d: fd.get('d') as string, cmp: fd.get('cmp') as string });
+    if (g.invalid) { fb.innerHTML = `<p class="warn">${esc(localizeInvalid(g.invalid))}</p>`; return; }
     if (g.correct) {
       answered = true;
-      sp.attempts = Math.min(63, sp.attempts + 1);
-      sp.correct = Math.min(31, sp.correct + 1);
+      sp.attempts = Math.min(31, sp.attempts + 1);
+      sp.correct = Math.min(15, sp.correct + 1);
       persist();
-      fb.innerHTML = `<p class="ok"><span aria-hidden="true">✓</span> ${T('Correct!', 'Yes, that’s right!')}` +
-        (g.simplestNote ? ` ${mathText(T(`In simplest form that’s ${answerText({ kind: 'frac', value: g.simplestNote })}.`, `The simplest way to write it is ${answerText({ kind: 'frac', value: g.simplestNote })}.`))}` : '') + `</p>`;
+      const note = g.simplestNote
+        ? ` ${mathText(`${T('simplest')} ${F.answerText({ kind: 'frac', value: g.simplestNote })}.`)}`
+        : '';
+      fb.innerHTML = `<p class="ok"><span aria-hidden="true">✓</span> ${esc(T('yesCorrect'))}${note}</p>`;
       form.querySelectorAll('input,button[type=submit]').forEach((el) => ((el as HTMLInputElement).disabled = true));
-      const cnt = $(`[data-skill="${skill}"] .count`, main); if (cnt) cnt.textContent = `(${sp.correct} ${T('correct', 'right')})`;
+      const cnt = $(`[data-skill="${skill}"] .count`, main); if (cnt) cnt.textContent = `(${sp.correct} ${T('correctWord')})`;
       $<HTMLButtonElement>('#next-btn', main).focus();
     } else {
-      fb.innerHTML = `<p class="warn">${T('Not quite. Try again, or open a hint.', 'Not yet. Try again, or press “Help me”.')}</p>`;
+      fb.innerHTML = `<p class="warn">${esc(T('notQuite'))}</p>`;
     }
   });
 }
 
-function showSteps(p: Problem) {
-  $('#help', main).innerHTML = `<h2>${T('Worked steps', 'How to do it')}</h2>${barsHTML(p)}
-    <ol class="steps">${p.steps.map((s) => `<li>${mathText(tx(s))}</li>`).join('')}</ol>
-    <p>${T('Answer', 'Answer')}: <strong>${mathText(answerText(p.answer))}</strong></p>
-    ${speakBtn(p.steps.map(tx).join(' '), T('Read the steps', 'Read out loud'))}`;
-  if (!answered) {
-    // Seeing the solution counts as an attempt (not a correct answer).
-    answered = true;
-    const sp = progress.skills[SKILLS.indexOf(p.skill)];
-    sp.attempts = Math.min(63, sp.attempts + 1); persist();
-    $<HTMLFormElement>('#answer', main).querySelectorAll('input,button[type=submit]').forEach((el) => ((el as HTMLInputElement).disabled = true));
-  }
-  $<HTMLButtonElement>('#next-btn', main).focus();
-}
-
-function results() {
+function results(p: Pack) {
   const pre = bitsCount(progress.preMask), post = bitsCount(progress.postMask);
-  const per = (mask: number, k: number) => bitsCount(mask & ((1 << k) | (1 << (k + 3))));
+  const len = p.checkLength;
+  const per = (mask: number, k: number) => {
+    // Fractions: 2 questions per skill at indices k and k+3. Other packs: no per-skill pre/post split.
+    if (isGenerated(p.practice)) return bitsCount(mask & ((1 << k) | (1 << (k + 3))));
+    return null;
+  };
   const diff = post - pre;
+  const rows = p.skills.map((s, k) => {
+    const preS = per(progress.preMask, k);
+    const postS = per(progress.postMask, k);
+    return `<tr><th scope="row">${esc(tx(s.name))}</th>${preS === null ? '' : `<td>${preS}/2</td><td>${progress.stage === 3 ? `${postS}/2` : '—'}</td>`}<td>${progress.skills[k].correct}</td></tr>`;
+  }).join('');
+  const skillHead = isGenerated(p.practice)
+    ? `<th scope="col">${esc(T('preTitle'))}</th><th scope="col">${esc(T('postTitle'))}</th>` : '';
   show('results', `
-    <h1>${T('Your results', 'How you did')}</h1>
-    <p class="big">${T('Before', 'Before')}: <strong>${pre}/${CHECK_LEN}</strong> → ${T('After', 'After')}: <strong>${post}/${CHECK_LEN}</strong>
+    <h1>${esc(T('results'))}</h1>
+    <p class="big">${esc(T('before'))}: <strong>${pre}/${len}</strong> → ${esc(T('after'))}: <strong>${post}/${len}</strong>
       ${diff > 0 ? `<span class="ok">(+${diff})</span>` : ''}</p>
     <table>
-      <caption>${T('Score by skill (2 questions each)', 'Score for each part (2 questions each)')}</caption>
-      <thead><tr><th scope="col">${T('Skill', 'Part')}</th><th scope="col">${T('Pre-check', 'First quiz')}</th><th scope="col">${T('Post-check', 'Final quiz')}</th><th scope="col">${T('Practice correct', 'Practice right')}</th></tr></thead>
-      <tbody>${SKILLS.map((s, k) => `<tr><th scope="row">${esc(tx(SKILL_NAME[s]))}</th><td>${per(progress.preMask, k)}/2</td><td>${progress.stage === 3 ? per(progress.postMask, k) + '/2' : '—'}</td><td>${progress.skills[k].correct}</td></tr>`).join('')}</tbody>
+      <caption>${esc(T('bySkill'))}${isGenerated(p.practice) ? ' (2 / 2)' : ''}</caption>
+      <thead><tr><th scope="col">${esc(T('skillH'))}</th>${skillHead}<th scope="col">${esc(T('practiceCorrect'))}</th></tr></thead>
+      <tbody>${rows}</tbody>
     </table>
-    <p>${T('Hints opened', 'Times you asked for help')}: ${progress.hints}</p>
+    <p>${esc(T('hintsOpened'))}: ${progress.hints}</p>
     <div class="row">
-      <button type="button" data-go="practice">${T('Keep practising', 'Practice more')}</button>
-      <button type="button" class="secondary" data-go="code">${T('Get my resume code', 'Get my code')}</button>
-      <button type="button" class="secondary" data-go="restart">${T('Start over', 'Start again')}</button>
+      <button type="button" data-go="practice">${esc(T('keepPractising'))}</button>
+      <button type="button" class="secondary" data-go="code">${esc(T('getCode'))}</button>
+      <button type="button" class="secondary" data-go="restart">${esc(T('startOver'))}</button>
     </div>`);
 }
 
@@ -300,130 +666,186 @@ function codeView() {
   const code = encode(progress);
   const url = `${location.origin}${location.pathname}#r=${code.replace(/-/g, '')}`;
   show('code', `
-    <h1>${T('Your resume code', 'Your code')}</h1>
-    <p>${T('Write this down or scan the QR code with your phone. Enter it on any device to continue where you left off.',
-        'Write this down, or point your phone camera at the square. Type it in on any device to keep going.')}</p>
-    <p class="code" id="the-code" aria-label="Resume code: ${code.replace(/-/g, '').split('').join(' ')}">${code}</p>
+    <h1>${esc(T('codeTitle'))}</h1>
+    <p>${esc(T('codeHelp'))}</p>
+    <p class="code" id="the-code" aria-label="${esc(T('resumeAria'))} ${code.replace(/-/g, '').split('').join(' ')}">${code}</p>
     <div class="row">
-      <button type="button" class="secondary" id="copy">${T('Copy code', 'Copy')}</button>
-      ${speakBtn(`Your code is: ${code.replace(/-/g, '').split('').join(', ')}`, T('Spell it out loud', 'Read code out loud'))}
+      <button type="button" class="secondary" id="copy">${esc(T('copyCode'))}</button>
+      ${speakBtn(`${T('yourCodeIs')} ${code.replace(/-/g, '').split('').join(', ')}`, T('spellCode'))}
     </div>
-    <figure class="qr"><div id="qr-slot" class="qr-slot"></div><figcaption>${T('Scan to continue on a phone', 'Scan with a phone')}</figcaption></figure>
-    <details class="card"><summary>${T('What’s in the code? Is it secure?', 'What is in the code?')}</summary>
-      <p>${T('Only a random problem number and your scores and counts, no name, no device ID. The last 2 characters are a checksum that catches typos (any single wrong character, or two swapped neighbours).',
-        'Only your scores and a random number. No name. The last 2 letters check for typing mistakes.')}</p>
-      <p>${T('Honest note: the checksum catches mistakes, not cheating. Someone who studies the app could make a fake code. That’s OK, because this is for your own practice, not a grade.',
-        'The code catches typos. It does not stop someone from making a fake code. That is OK. This is only for your own practice.')}</p>
+    <figure class="qr"><div id="qr-slot" class="qr-slot"></div><figcaption>${esc(T('scanCaption'))}</figcaption></figure>
+    <details class="card"><summary>${esc(T('whatsInCode'))}</summary>
+      <p>${esc(T('codePrivacy'))}</p>
+      <p>${esc(T('codeHonest'))}</p>
     </details>
-    <div class="row"><button type="button" data-go="continue">${T('Back to practice', 'Go back')}</button></div>`);
-  // QR library is lazy-loaded (still precached for offline use) to keep first load small.
+    <div class="row"><button type="button" data-go="continue">${esc(T('backToPractice'))}</button></div>`);
   import('./qr').then(({ qrSvg }) => {
     const slot = $('#qr-slot', main);
-    if (slot) slot.innerHTML = qrSvg(url, T('QR code with a link to continue using your resume code', 'Square code to scan with a phone'));
+    if (slot) slot.innerHTML = qrSvg(url, T('qrLabel'));
   });
   $('#copy', main).addEventListener('click', async () => {
     const btn = $('#copy', main);
-    try { await navigator.clipboard.writeText(code); btn.textContent = T('Copied', 'Copied'); }
-    catch { btn.textContent = T('Copy failed: select the code and copy it', 'Could not copy'); }
+    try { await navigator.clipboard.writeText(code); btn.textContent = T('copied'); }
+    catch { btn.textContent = T('copyFail'); }
   });
+}
+
+function decodeError(code: string): string {
+  if (code.startsWith('len:')) return T('codeErrLen', { n: code.slice(4) });
+  if (code.startsWith('char:')) return T('codeErrChar', { ch: code.slice(5) });
+  if (code === 'typo') return T('codeErrTypo');
+  if (code === 'version') return T('codeErrVersion');
+  if (code === 'impossible') return T('codeErrImpossible');
+  if (code === 'pack') return T('codeErrPack');
+  return T('codeErrTypo');
+}
+
+async function resolvePackForHash(h: number): Promise<Pack | null> {
+  if (customPack && packHash(customPack) === h) return customPack;
+  for (const c of CATALOG) {
+    const p = await loadBuiltin(c.id);
+    if (packHash(p) === h) return p;
+  }
+  return null;
 }
 
 function restoreView(prefill = '') {
   show('restore', `
-    <h1>${T('Continue with a resume code', 'Type your code')}</h1>
+    <h1>${esc(T('restoreTitle'))}</h1>
     <form id="restore" novalidate>
-      <label for="code-in">${T('Resume code (18 letters and numbers; dashes optional)', 'Your code (18 letters and numbers)')}</label>
+      <label for="code-in">${esc(T('codeLabel'))}</label>
       <input id="code-in" name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${esc(prefill)}" aria-describedby="code-help code-err">
-      <p id="code-help" class="hint-text">${T('Capital or small letters both work. O and 0 count as the same, as do I, L and 1.', 'Big or small letters are fine.')}</p>
+      <p id="code-help" class="hint-text">${esc(T('codeHint'))}</p>
       <p id="code-err" role="alert"></p>
-      <div class="row"><button type="submit">${T('Restore progress', 'Continue')}</button>
-      <button type="button" class="secondary" data-go="home">${T('Cancel', 'Back')}</button></div>
+      <div class="row"><button type="submit">${esc(T('restoreBtn'))}</button>
+      <button type="button" class="secondary" data-go="home">${esc(T('cancel'))}</button></div>
     </form>`);
   const input = $<HTMLInputElement>('#code-in', main);
-  $('#restore', main).addEventListener('submit', (e) => {
+  $('#restore', main).addEventListener('submit', async (e) => {
     e.preventDefault();
     const r = decode(input.value);
-    if (!r.ok) { input.setAttribute('aria-invalid', 'true'); $('#code-err', main).textContent = r.error; input.focus(); return; }
-    progress = r.progress; persist();
-    show('restored', `<h1>${T('Progress restored', 'Welcome back!')}</h1>
-      <p>${T('Pre-check', 'First quiz')}: ${bitsCount(progress.preMask)}/${CHECK_LEN} · ${T('Practice correct', 'Practice right')}: ${progress.skills.reduce((a, s) => a + s.correct, 0)}</p>
-      <div class="row"><button type="button" data-go="continue">${T('Continue', 'Keep going')}</button></div>`);
+    if (!r.ok) { input.setAttribute('aria-invalid', 'true'); $('#code-err', main).textContent = decodeError(r.error); input.focus(); return; }
+    const matched = await resolvePackForHash(r.progress.packHash);
+    if (!matched) { input.setAttribute('aria-invalid', 'true'); $('#code-err', main).textContent = decodeError('pack'); input.focus(); return; }
+    pack = matched; packId = matched.id; progress = r.progress; persist();
+    show('restored', `<h1>${esc(T('restored'))}</h1>
+      <p>${esc(tx(matched.title))} · ${esc(T('preTitle'))}: ${bitsCount(progress.preMask)}/${matched.checkLength} · ${esc(T('practiceCorrect'))}: ${progress.skills.reduce((a, s) => a + s.correct, 0)}</p>
+      <div class="row"><button type="button" data-go="continue">${esc(T('continue'))}</button></div>`);
   });
 }
 
 function endView() {
   const code = encode(progress);
   show('end', `
-    <h1>${T('End session and wipe this device', 'End and forget')}</h1>
-    <p>${T('This removes everything this app stored in this browser: progress and settings (local and session storage) and any IndexedDB data.',
-        'This deletes everything this app saved in this browser.')}</p>
-    <p>${T('Want to continue later? Write down your code first:', 'Want to keep going later? Write down your code first:')} <span class="code small">${code}</span></p>
+    <h1>${esc(T('endTitle'))}</h1>
+    <p>${esc(T('endBody'))}</p>
+    <p>${esc(T('endCodeFirst'))} <span class="code small">${code}</span></p>
     <label class="check"><input type="checkbox" id="wipe-offline">
-      ${T('Also remove the offline copy of the app (it contains no personal data, but removes all trace of the app)', 'Also delete the offline copy of the app')}</label>
-    <div class="row"><button type="button" class="danger" id="wipe">${T('Yes, wipe and end session', 'Yes, forget everything')}</button>
-    <button type="button" class="secondary" data-go="continue">${T('Cancel', 'No, go back')}</button></div>`);
+      ${esc(T('wipeOffline'))}</label>
+    <div class="row"><button type="button" class="danger" id="wipe">${esc(T('wipeYes'))}</button>
+    <button type="button" class="secondary" data-go="continue">${esc(T('cancel'))}</button></div>`);
   $('#wipe', main).addEventListener('click', async () => {
     const r = await endSession($<HTMLInputElement>('#wipe-offline', main).checked);
-    settings = defaultSettings(); progress = newProgress(); applySettings();
-    show('ended', `<h1>${T('Session ended', 'All done. Forgotten.')}</h1>
-      <p role="status">${T('Wiped: local and session storage', 'Deleted: saved progress and settings')}${r.indexedDB ? `, ${r.indexedDB} IndexedDB database(s)` : ''}${r.caches ? `, ${r.caches} offline cache(s) and ${r.serviceWorkers} service worker(s)` : ''}.</p>
-      <p>${T('Close this tab when you’re done. Note: the browser’s own history may still list that this site was visited. A private/incognito window avoids that.',
-          'Close this tab now. The browser history may still show this website. A private window avoids that.')}</p>
-      <div class="row"><button type="button" data-go="home">${T('Start fresh', 'Start again')}</button></div>`);
+    settings = defaultSettings(); progress = newProgress(packHash({ id: 'permission' }));
+    packId = 'permission'; pack = null; customPack = null; applySettings();
+    const extra = `${r.indexedDB ? `, ${r.indexedDB} ${T('idbWord')}` : ''}${r.caches ? `, ${r.caches} ${T('cacheWord')} ${T('ofWord')} ${r.serviceWorkers} ${T('swWord')}` : ''}`;
+    // Keep English "and" structure close to the original wipe status for tests: "offline cache"
+    const status = settings.lang === 'en'
+      ? `${T('wiped')}${r.indexedDB ? `, ${r.indexedDB} IndexedDB database(s)` : ''}${r.caches ? `, ${r.caches} offline cache(s) and ${r.serviceWorkers} service worker(s)` : ''}.`
+      : `${T('wiped')}${extra}.`;
+    show('ended', `<h1>${esc(T('ended'))}</h1>
+      <p role="status">${esc(status)}</p>
+      <p>${esc(T('endNote'))}</p>
+      <div class="row"><button type="button" data-go="home">${esc(T('startFresh'))}</button></div>`);
   });
 }
 
 function about() {
   show('about', `
-    <h1>${T('About & credits', 'About this app')}</h1>
-    <p>ShareSafe Practice ${T('is a free, offline-first practice app for students using old phones or shared and library computers.', 'helps students practice on old phones or shared computers.')}</p>
-    <h2>${T('Content credit', 'Where the lessons come from')}</h2>
-    <p>${T('Topics follow', 'Topics follow')} <cite>Prealgebra 2e</cite>, ${T('Chapter 4 “Fractions”, by Lynn Marecek, MaryAnne Anthony-Smith and Andrea Honeycutt Mathis, © OpenStax / Rice University, licensed under', 'Chapter 4, by OpenStax, shared under')}
-      <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>. ${T('Access for free at', 'Free at')} <a href="https://openstax.org/details/books/prealgebra-2e">openstax.org</a>.
-      ${T('Changes: no text was copied; all problems, hints and steps here are original and generated by code.', 'We wrote our own problems.')}</p>
-    <h2>${T('Privacy', 'Privacy')}</h2>
-    <p>${T('No accounts, no analytics, no network requests after the first load. Nothing leaves your device.', 'No sign-up. No tracking. Nothing is sent anywhere.')}</p>
-    <div class="row"><button type="button" data-go="home">${T('Back', 'Back')}</button></div>`);
+    <h1>${esc(T('aboutTitle'))}</h1>
+    <p>${esc(T('aboutLead'))}</p>
+    <h2>${esc(T('contentH'))}</h2>
+    <p>${esc(T('contentBody'))}
+      <a href="https://creativecommons.org/licenses/by/4.0/">${esc(T('ccby'))}</a>.
+      <a href="https://openstax.org/details/books/prealgebra-2e">${esc(T('openstax'))}</a>.</p>
+    <h2>${esc(T('privacyAboutH'))}</h2>
+    <p>${esc(T('privacyAbout'))}</p>
+    <div class="row"><button type="button" data-go="home">${esc(T('back'))}</button></div>`);
+}
+
+function openBuilder() {
+  view = 'builder';
+  if (canSpeak) speechSynthesis.cancel();
+  main.innerHTML = `<h1>${esc(T('packingWait'))}</h1>`;
+  import('./builder').then((m) => {
+    m.showBuilder({
+      main, t: T, esc, lang: lang(),
+      onHome: () => go('home'),
+      onTry: (p: Pack) => { customPack = p; packId = p.id; pack = p; progress = newProgress(packHash(p)); persist(); go('start'); },
+    });
+  });
 }
 
 // ---------- navigation ----------
 function go(where: string) {
   switch (where) {
     case 'home': return home();
-    case 'start': progress = newProgress(); persist(); return check('pre');
+    case 'start':
+      return void withPack((p) => {
+        progress = newProgress(packHash(p)); skill = p.skills[0]?.id ?? ''; persist();
+        return check(p, 'pre');
+      });
     case 'continue': return cont();
-    case 'restore': return restoreView();
-    case 'begin-practice': progress.stage = 1; persist(); return practice();
-    case 'practice': if (progress.stage === 0) progress.stage = 1; persist(); return practice();
-    case 'post': progress.stage = 2; persist(); return progress.postCount >= CHECK_LEN ? results() : check('post');
+    case 'restore': return restoreView(pendingRestore);
+    case 'begin-practice':
+      return void withPack((p) => { progress.stage = 1; skill = p.skills[0]?.id ?? skill; persist(); return practice(p); });
+    case 'practice':
+      return void withPack((p) => { if (progress.stage === 0) progress.stage = 1; persist(); return practice(p); });
+    case 'post':
+      return void withPack((p) => {
+        progress.stage = 2; persist();
+        return progress.postCount >= p.checkLength ? results(p) : check(p, 'post');
+      });
     case 'code': return codeView();
     case 'end': return endView();
     case 'about': return about();
-    case 'restart': progress = newProgress(); persist(); return check('pre');
+    case 'builder': return openBuilder();
+    case 'restart':
+      return void withPack((p) => { progress = newProgress(packHash(p)); persist(); return check(p, 'pre'); });
   }
 }
 
 document.addEventListener('click', (e) => {
-  const t = (e.target as HTMLElement).closest('[data-go],[data-skill],[data-speak]') as HTMLElement | null;
-  if (!t) return;
-  if (t.dataset.go) { e.preventDefault(); go(t.dataset.go); }
-  else if (t.dataset.skill) { skill = t.dataset.skill as Skill; practice(); }
-  else if (t.dataset.speak) speak(t.dataset.speak);
+  const tEl = (e.target as HTMLElement).closest('[data-go],[data-skill],[data-speak]') as HTMLElement | null;
+  if (!tEl) return;
+  if (tEl.dataset.go) { e.preventDefault(); go(tEl.dataset.go); }
+  else if (tEl.dataset.skill) {
+    skill = tEl.dataset.skill;
+    void withPack((p) => practice(p));
+  }
+  else if (tEl.dataset.speak) speak(tEl.dataset.speak);
 });
 $('#t-size').addEventListener('click', () => { settings.largeText = ((settings.largeText + 1) % 3) as 0 | 1 | 2; applySettings(); persist(); });
 $('#t-contrast').addEventListener('click', () => { settings.contrast = !settings.contrast; applySettings(); persist(); });
 $('#t-plain').addEventListener('click', () => { settings.plain = !settings.plain; applySettings(); persist(); rerender(); });
+$('#t-lang').addEventListener('click', () => { settings.lang = settings.lang === 'en' ? 'es' : 'en'; applySettings(); persist(); rerender(); $('#t-lang').focus(); });
+
 function rerender() {
   const focusId = document.activeElement?.id;
-  ({ home, practice, results, code: codeView, about, end: endView, restore: () => restoreView(), predone: preDone,
-     pre: () => check('pre'), post: () => check('post') } as Record<string, () => void>)[view]?.();
-  if (focusId === 't-plain') $('#t-plain').focus();
+  if (view === 'builder') { openBuilder(); if (focusId === 't-plain' || focusId === 't-lang') $('#' + focusId)?.focus(); return; }
+  const map: Record<string, () => void> = {
+    home, practice: () => void withPack((p) => practice(p)), results: () => void withPack((p) => results(p)),
+    code: codeView, about, end: endView, restore: () => restoreView(), predone: () => void withPack((p) => preDone(p)),
+    pre: () => void withPack((p) => check(p, 'pre')), post: () => void withPack((p) => check(p, 'post')),
+  };
+  map[view]?.();
+  if (focusId === 't-plain' || focusId === 't-lang') $('#' + focusId)?.focus();
 }
 
 // ---------- offline status ----------
 const net = $('#net');
 function updateNet() {
-  net.textContent = navigator.onLine ? '' : 'You are offline. Everything still works.';
+  net.textContent = navigator.onLine ? '' : T('offlineBanner');
   net.hidden = navigator.onLine;
 }
 addEventListener('online', updateNet); addEventListener('offline', updateNet);
@@ -431,14 +853,28 @@ updateNet();
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   navigator.serviceWorker.register('./sw.js').then(() => navigator.serviceWorker.ready).then(() => {
-    $('#sw-status').textContent = 'Ready to work offline.';
-  }).catch(() => { $('#sw-status').textContent = 'Offline mode unavailable in this browser.'; });
+    $('#sw-status').textContent = T('swReady');
+  }).catch(() => { $('#sw-status').textContent = T('swFail'); });
 }
 
 // ---------- boot ----------
+function handleHash(initial = false) {
+  const hash = location.hash;
+  if (/^#r=([0-9A-Za-z-]+)$/.test(hash)) {
+    const code = hash.slice(3);
+    history.replaceState(null, '', location.pathname + location.search);
+    pendingRestore = normalizeInput(code);
+    restoreView(pendingRestore);
+  } else if (hash.startsWith('#p=')) {
+    const r = decodePackHash(hash.slice(3));
+    if (r.ok) { customPack = r.pack; packId = r.pack.id; pack = r.pack; persist(); }
+    home(initial ? false : true);
+  } else if (hash === '#builder') {
+    openBuilder();
+  } else if (initial) {
+    home(false);
+  }
+}
 applySettings();
-const m = location.hash.match(/^#r=([0-9A-Za-z-]+)$/);
-if (m) {
-  history.replaceState(null, '', location.pathname + location.search); // don't leave the code in the address bar
-  restoreView(normalizeInput(m[1]));
-} else home(false);
+handleHash(true);
+addEventListener('hashchange', () => handleHash());

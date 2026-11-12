@@ -1,7 +1,7 @@
 {
   "name": "sharesafe-practice",
   "version": "0.1.0",
-  "description": "Offline-first, privacy-preserving fractions practice PWA for shared and low-end devices.",
+  "description": "Offline-first, privacy-preserving digital-safety lessons for shared and low-end devices.",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build && node scripts/gen-sw.mjs",

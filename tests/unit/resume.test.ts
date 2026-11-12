@@ -8,15 +8,15 @@ function randomProgress(r: () => number): Progress {
   const int = (n: number) => Math.floor(r() * n);
   const preCount = int(7), postCount = int(7);
   return normalize({
-    seed: int(65536), stage: int(4), preCount, preMask: int(64), postCount, postMask: int(64),
-    skills: [0, 1, 2].map(() => { const a = int(64); return { attempts: a, correct: int(Math.min(31, a) + 1) }; }) as Progress['skills'],
-    hints: int(64),
+    packHash: int(1024), seed: int(16384), stage: int(4), preCount, preMask: int(64), postCount, postMask: int(64),
+    skills: [0, 1, 2].map(() => { const a = int(32); return { attempts: a, correct: int(Math.min(15, a) + 1) }; }) as Progress['skills'],
+    hints: int(32),
   });
 }
 
 describe('resume code', () => {
   it('has the documented format', () => {
-    const code = encode(newProgress(1));
+    const code = encode(newProgress(0, 1));
     expect(code).toMatch(/^[0-9A-HJKMNP-TV-Z]{6}-[0-9A-HJKMNP-TV-Z]{6}-[0-9A-HJKMNP-TV-Z]{6}$/);
     expect(code.replace(/-/g, '')).toHaveLength(CODE_LEN);
   });
@@ -40,10 +40,10 @@ describe('resume code', () => {
   });
 
   it('saturates counters instead of wrapping', () => {
-    const p = newProgress(9); p.skills[0] = { correct: 500, attempts: 900 }; p.hints = 1000;
+    const p = newProgress(0, 9); p.skills[0] = { correct: 500, attempts: 900 }; p.hints = 1000;
     const d = decode(encode(p));
-    expect(d.ok && d.progress.skills[0]).toEqual({ correct: 31, attempts: 63 });
-    expect(d.ok && d.progress.hints).toBe(63);
+    expect(d.ok && d.progress.skills[0]).toEqual({ correct: 15, attempts: 31 });
+    expect(d.ok && d.progress.hints).toBe(31);
   });
 
   it('detects EVERY single-character substitution (exhaustive over 200 codes)', () => {
@@ -70,27 +70,34 @@ describe('resume code', () => {
 
   it('rejects wrong length and invalid characters with a helpful message', () => {
     const d1 = decode('ABC'); expect(d1.ok).toBe(false);
-    expect(!d1.ok && d1.error).toMatch(/18/);
-    const d2 = decode('U'.repeat(18)); expect(!d2.ok && d2.error).toMatch(/isn't used/);
+    expect(!d1.ok && d1.error).toMatch(/len:3/);
+    const d2 = decode('U'.repeat(18)); expect(!d2.ok && d2.error).toMatch(/^char:U$/);
   });
 
   it('rejects checksum-valid codes with impossible values', () => {
-    // Build bits by hand: preCount = 7 (impossible) with a correct CRC.
     const bits: number[] = [];
     const push = (v: number, w: number) => { for (let i = w - 1; i >= 0; i--) bits.push((v >> i) & 1); };
-    push(1, 3); push(0, 16); push(0, 2); push(7, 3); push(0, 6); push(0, 3); push(0, 6);
-    for (let i = 0; i < 3; i++) { push(0, 5); push(0, 6); } push(0, 6);
+    push(2, 3); push(0, 10); push(0, 14); push(0, 2); push(7, 3); push(0, 6); push(0, 3); push(0, 6);
+    for (let i = 0; i < 3; i++) { push(0, 4); push(0, 5); } push(0, 5);
     while (bits.length < 80) bits.push(0);
     push(crc10(bits), 10);
     let s = ''; for (let i = 0; i < 90; i += 5) s += ALPHABET[parseInt(bits.slice(i, i + 5).join(''), 2)];
     const d = decode(s);
     expect(d.ok).toBe(false);
-    expect(!d.ok && d.error).toMatch(/impossible/);
+    expect(!d.ok && d.error).toBe('impossible');
   });
 
   it('contains no personal data: the code depends only on the progress fields', () => {
-    const p = newProgress(123);
+    const p = newProgress(0, 123);
     expect(encode(p)).toBe(encode(JSON.parse(JSON.stringify(p))));
-    expect(Object.keys(p).sort()).toEqual(['hints', 'postCount', 'postMask', 'preCount', 'preMask', 'seed', 'skills', 'stage']);
+    expect(Object.keys(p).sort()).toEqual(['hints', 'packHash', 'postCount', 'postMask', 'preCount', 'preMask', 'seed', 'skills', 'stage']);
+  });
+
+  it('encodes the pack hash so two packs do not share a code meaning', () => {
+    const a = newProgress(11, 99);
+    const b = newProgress(12, 99);
+    expect(encode(a)).not.toBe(encode(b));
+    const d = decode(encode(a));
+    expect(d.ok && d.progress.packHash).toBe(11);
   });
 });

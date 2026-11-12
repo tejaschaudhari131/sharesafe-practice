@@ -13,130 +13,139 @@ internet access.
 That's from Pew Research Center, 2018.
 
 4
-00:00:12,000 --> 00:00:16,397
-ShareSafe Practice is fractions practice
-for students like Maya, a seventh grader
-on
+00:00:12,000 --> 00:00:16,582
+ShareSafe Practice is digital-safety
+lessons for students like Maya, a seventh
 
 5
-00:00:16,447 --> 00:00:19,476
-a library computer with an old phone at
-home.
+00:00:16,632 --> 00:00:21,213
+grader on a library computer with an old
+phone at home.
 
 6
-00:00:19,526 --> 00:00:24,608
+00:00:21,263 --> 00:00:27,529
 No account, no name, and nothing saved
 after she closes the tab, unless she
 chooses
 
 7
-00:00:24,658 --> 00:00:24,950
+00:00:27,579 --> 00:00:27,950
 to.
 
 8
-00:00:25,000 --> 00:00:29,424
+00:00:28,000 --> 00:00:30,867
 Everything works from the keyboard.
 
 9
-00:00:29,474 --> 00:00:33,897
-Start with a six-question pre-check.
+00:00:30,917 --> 00:00:36,700
+She picks Permission to Learn and starts a
+six-question pre-check.
 
 10
-00:00:33,947 --> 00:00:41,950
-No hints here, it just shows where you
-begin.
+00:00:36,750 --> 00:00:41,950
+No hints here, it just shows where she
+begins.
 
 11
-00:00:42,000 --> 00:00:51,950
-In practice, every problem has three hints
-that build step by step, a fraction bar
+00:00:42,000 --> 00:00:52,266
+The lesson opens on a confusing 403
+Forbidden screen, then explains it in
+plain
 
 12
-00:00:52,000 --> 00:00:55,283
-model, and full worked steps.
+00:00:52,316 --> 00:00:53,003
+language.
 
 13
-00:00:55,333 --> 00:01:03,283
-The method follows OpenStax Prealgebra,
-but every problem is original and
-generated
+00:00:53,053 --> 00:01:02,582
+Then she practises least privilege: who
+can view or edit a class roster.
 
 14
-00:01:03,333 --> 00:01:07,950
-by code, so there's always another one.
+00:01:02,632 --> 00:01:09,950
+If she grants too much access, the
+feedback says so.
 
 15
-00:01:08,000 --> 00:01:15,318
+00:01:10,000 --> 00:01:17,362
 Students can make the text bigger, switch
 to high contrast, or turn on plain
 
 16
-00:01:15,368 --> 00:01:20,582
-language, which rewrites every instruction
-and hint in simpler words.
+00:01:17,412 --> 00:01:17,891
+language.
 
 17
-00:01:20,632 --> 00:01:27,950
-Read aloud speaks the problem, and screen
-readers hear fractions as three over four.
+00:01:17,941 --> 00:01:24,244
+A language switcher sets Spanish,
+including the lesson, and updates the page
 
 18
-00:01:28,000 --> 00:01:35,807
+00:01:24,294 --> 00:01:27,950
+language so a screen reader switches too.
+
+19
+00:01:28,000 --> 00:01:34,472
 Before leaving the library, Maya gets her
 resume code, or scans the QR with her
 
-19
-00:01:35,857 --> 00:01:36,331
+20
+00:01:34,522 --> 00:01:34,907
 phone.
 
-20
-00:01:36,381 --> 00:01:41,569
-Her progress moves over with no account
-and no server.
-
 21
-00:01:41,619 --> 00:01:44,712
-The last two characters catch typos.
+00:01:34,957 --> 00:01:41,863
+It carries her progress and which pack she
+was in, with no account and no server.
 
 22
-00:01:44,762 --> 00:01:49,950
-They don't stop forgery, and the app says
-so honestly.
+00:01:41,913 --> 00:01:47,950
+The last two characters catch typos, not
+forgery, and the app says so honestly.
 
 23
-00:01:50,000 --> 00:01:58,814
-The whole app is about eighteen kilobytes
-and is cached after one visit.
+00:01:48,000 --> 00:01:55,863
+The first load is about twenty-eight
+kilobytes, and packs are cached after one
 
 24
-00:01:58,864 --> 00:02:04,950
+00:01:55,913 --> 00:01:56,472
+visit.
+
+25
+00:01:56,522 --> 00:02:01,950
 So at home, with no internet, it still
 works.
 
-25
-00:02:05,000 --> 00:02:12,298
+26
+00:02:02,000 --> 00:02:09,298
 On the shared computer, End session wipes
 everything the app stored, including the
 
-26
-00:02:12,348 --> 00:02:17,950
+27
+00:02:09,348 --> 00:02:14,950
 offline copy if she wants, and confirms
 what it removed.
 
-27
-00:02:18,000 --> 00:02:20,719
+28
+00:02:15,000 --> 00:02:17,200
 Then the post-check shows her growth.
 
-28
-00:02:20,769 --> 00:02:26,719
+29
+00:02:17,250 --> 00:02:22,450
+Teachers can build a pack, watch the byte
+count, and print a QR handout.
+
+30
+00:02:22,500 --> 00:02:27,325
 Lighthouse scores a hundred in every
 category, axe finds no violations, and
 real
 
-29
-00:02:26,769 --> 00:02:29,027
+31
+00:02:27,375 --> 00:02:29,200
 screen reader testing is next.
 
-30
-00:02:29,077 --> 00:02:29,950
+32
+00:02:29,250 --> 00:02:29,950
 ShareSafe Practice.

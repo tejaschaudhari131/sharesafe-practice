@@ -1,54 +1,44 @@
 import { expect, test } from '@playwright/test';
-import { answerByKeyboard, currentPracticeProblem, doCheck, getProgress, tabTo } from './helpers';
+import { accessItem, answerAccessByKeyboard, doCheck, doFracCheck, getProgress, permission, startPre, tabTo } from './helpers';
 
-test('keyboard-only: pre-check → practice with hint → resume code → restore on a "new device"', async ({ page, browser }) => {
+test('keyboard-only: Permission to Learn pre-check → 403 intro → access practice → resume code restores the pack', async ({ page, browser }) => {
   await page.goto('/');
-  await expect(page.locator('h1')).toHaveText(/Practice fractions/);
-  // Skip link is the first Tab stop.
+  await expect(page.locator('h1')).toHaveText(/Digital-safety lessons/);
+  await expect(page.locator('input[name=pack][value=permission]')).toBeChecked();
   await page.keyboard.press('Tab');
   await expect(page.locator('.skip')).toBeFocused();
 
   await tabTo(page, 'button[data-go=start]');
   await page.keyboard.press('Enter');
-  await doCheck(page, 'pre', 4); // 4 right, 2 wrong
+  await expect(page.locator('h1')).toContainText(/question 1 of 6/, { timeout: 15_000 });
+  await doCheck(page, 'pre', 4);
   await expect(page.locator('h1')).toHaveText('Pre-check done');
   await expect(page.locator('.big')).toContainText('4 of 6');
+  await expect(page.locator('.mock-status')).toHaveText('403 Forbidden');
   await tabTo(page, 'button[data-go=begin-practice]');
   await page.keyboard.press('Enter');
 
-  // Practice: wrong answer → feedback; hint; then correct.
-  await expect(page.locator('h1')).toContainText('Equivalent fractions');
-  const p = await currentPracticeProblem(page, 'equiv');
-  await answerByKeyboard(page, p, true);
-  await expect(page.locator('#feedback')).toContainText('Not quite');
+  await expect(page.locator('h1')).toContainText('Class roster');
+  const roster = accessItem('roster');
+  await answerAccessByKeyboard(page, roster, true);
+  await expect(page.locator('#feedback')).toContainText(/more access|Not quite/);
   await tabTo(page, '#hint-btn'); await page.keyboard.press('Enter');
   await expect(page.locator('#help ol.hints li')).toHaveCount(1);
-  await page.keyboard.press('Enter');
-  await expect(page.locator('#help ol.hints li')).toHaveCount(2);
-  await expect(page.locator('#help svg[role=img]').first()).toHaveAttribute('aria-label', /equal parts/);
-  await answerByKeyboard(page, p);
+  await answerAccessByKeyboard(page, roster);
   await expect(page.locator('#feedback')).toContainText('Correct');
   await expect(page.locator('#next-btn')).toBeFocused();
-  await page.keyboard.press('Enter');
-
-  // Practise another skill via the skill switcher.
-  await tabTo(page, 'button[data-skill=addsub]'); await page.keyboard.press('Enter');
-  const p2 = await currentPracticeProblem(page, 'addsub');
-  await answerByKeyboard(page, p2);
-  await expect(page.locator('#feedback')).toContainText('Correct');
 
   const before = await getProgress(page);
+  expect(before.packHash).toBeTruthy();
   await tabTo(page, 'button[data-go=code]'); await page.keyboard.press('Enter');
   const code = (await page.locator('#the-code').textContent())!.trim();
   expect(code).toMatch(/^[0-9A-Z]{6}-[0-9A-Z]{6}-[0-9A-Z]{6}$/);
   await expect(page.locator('.qr-svg')).toBeVisible();
 
-  // New device = fresh browser context with empty storage.
   const ctx2 = await browser.newContext();
   const p2page = await ctx2.newPage();
   await p2page.goto('/');
   await p2page.getByRole('button', { name: 'I have a resume code' }).click();
-  // A typo is caught with a helpful message.
   const typo = code.slice(0, 3) + (code[3] === 'A' ? 'B' : 'A') + code.slice(4);
   await p2page.getByLabel(/Resume code/).fill(typo);
   await p2page.keyboard.press('Enter');
@@ -56,15 +46,16 @@ test('keyboard-only: pre-check → practice with hint → resume code → restor
   await p2page.getByLabel(/Resume code/).fill(code.toLowerCase().replace(/-/g, ' '));
   await p2page.keyboard.press('Enter');
   await expect(p2page.locator('h1')).toHaveText('Progress restored');
+  await expect(p2page.locator('main')).toContainText('Permission to Learn');
   await expect(p2page.locator('main')).toContainText('Pre-check: 4/6');
   const after = await getProgress(p2page);
   expect(after).toEqual(JSON.parse(JSON.stringify(before)));
   await ctx2.close();
 });
 
-test('QR link (#r=CODE) pre-fills restore and clears the code from the address bar', async ({ page }) => {
+test('QR link (#r=CODE) pre-fills restore, clears the hash, and reopens the same pack', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Start the pre-check' }).click();
+  await startPre(page);
   await doCheck(page, 'pre', 6);
   await page.getByRole('button', { name: 'Resume code', exact: true }).click();
   const code = (await page.locator('#the-code').textContent())!.replace(/-/g, '');
@@ -74,15 +65,16 @@ test('QR link (#r=CODE) pre-fills restore and clears the code from the address b
   await expect(p.locator('h1')).toHaveText('Continue with a resume code');
   expect(new URL(p.url()).hash).toBe('');
   await p.getByRole('button', { name: 'Restore progress' }).click();
+  await expect(p.locator('main')).toContainText('Permission to Learn');
   await expect(p.locator('main')).toContainText('Pre-check: 6/6');
   await ctx.close();
 });
 
 test('full journey reaches before/after results', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Start the pre-check' }).click();
+  await startPre(page);
   await doCheck(page, 'pre', 2);
-  await page.getByRole('button', { name: 'Start practising' }).click();
+  await page.getByRole('button', { name: 'Continue the lesson' }).click();
   await page.getByRole('button', { name: 'Take the post-check' }).click();
   await doCheck(page, 'post', 5);
   await expect(page.locator('h1')).toHaveText('Your results');
@@ -91,21 +83,19 @@ test('full journey reaches before/after results', async ({ page }) => {
   await expect(page.locator('.big')).toContainText('+3');
 });
 
-test('works offline after first load', async ({ page, context }) => {
+test('works offline after first load, including a lazy pack and the QR chunk', async ({ page, context }) => {
   await page.goto('/');
   await expect(page.locator('#sw-status')).toHaveText('Ready to work offline.', { timeout: 15000 });
-  await page.reload(); // ensure page is controlled by the SW
+  await page.reload();
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
   await context.setOffline(true);
   await page.reload();
-  await expect(page.locator('h1')).toHaveText(/Practice fractions/);
+  await expect(page.locator('h1')).toHaveText(/Digital-safety lessons/);
   await expect(page.locator('#net')).toHaveText(/offline/);
-  await page.getByRole('button', { name: 'Start the pre-check' }).click();
+  await startPre(page);
   await expect(page.locator('h1')).toContainText('question 1 of 6');
-  // A deep link also works offline (navigation fallback to cached index.html).
   await page.goto('/?from=offline');
   await expect(page.locator('h1')).toBeVisible();
-  // The lazily loaded QR chunk is precached too.
   await page.getByRole('button', { name: 'Resume code', exact: true }).click();
   await expect(page.locator('.qr-svg')).toBeVisible();
   await context.setOffline(false);
@@ -113,17 +103,15 @@ test('works offline after first load', async ({ page, context }) => {
 
 test('leave-no-trace: default uses session storage only; End session wipes storage and offline copy', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Start the pre-check' }).click();
+  await startPre(page);
   await doCheck(page, 'pre', 3);
   expect(await page.evaluate(() => localStorage.length)).toBe(0);
-  expect(await page.evaluate(() => sessionStorage.getItem('sharesafe:v1'))).toBeTruthy();
+  expect(await page.evaluate(() => sessionStorage.getItem('sharesafe:v2'))).toBeTruthy();
 
-  // Opt in to saving on device → localStorage used.
   await page.getByRole('link', { name: 'ShareSafe Practice' }).click();
   await page.getByLabel(/Save progress on this device/).check();
-  expect(await page.evaluate(() => localStorage.getItem('sharesafe:v1'))).toBeTruthy();
+  expect(await page.evaluate(() => localStorage.getItem('sharesafe:v2'))).toBeTruthy();
   await expect(page.locator('#sw-status')).toHaveText('Ready to work offline.', { timeout: 15000 });
-  // An IndexedDB database (simulating anything left behind) gets removed too.
   await page.evaluate(() => new Promise((r) => { const q = indexedDB.open('leftover'); q.onsuccess = () => { q.result.close(); r(null); }; }));
 
   await page.getByRole('button', { name: 'End session' }).click();
@@ -141,7 +129,7 @@ test('leave-no-trace: default uses session storage only; End session wipes stora
   expect(state).toEqual({ ls: 0, ss: 0, caches: 0, sws: 0, dbs: 0 });
 });
 
-test('accessibility toggles: text size, high contrast, plain language', async ({ page }) => {
+test('accessibility toggles: text size, high contrast, plain language, and Spanish', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: /Text size/ }).click();
   await expect(page.locator('html')).toHaveClass(/lt1/);
@@ -149,6 +137,53 @@ test('accessibility toggles: text size, high contrast, plain language', async ({
   await expect(page.locator('html')).toHaveClass(/hc/);
   await expect(page.getByRole('button', { name: 'High contrast' })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Plain language' }).click();
-  await expect(page.locator('h1')).toHaveText('Practice fractions. No sign-up.');
+  await expect(page.locator('h1')).toHaveText('Learn to stay safe online. No sign-up.');
   await expect(page.getByRole('button', { name: 'Plain language' })).toBeFocused();
+  await page.getByRole('button', { name: 'English' }).click();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'es');
+  await expect(page.locator('h1')).toHaveText(/Lecciones de seguridad digital|Aprende a cuidarte/);
+  await expect(page.locator('html')).toHaveAttribute('lang', 'es');
+});
+
+test('Spot the Scam and Fractions packs load from the home picker', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('input[name=pack][value=scam]').check();
+  await startPre(page);
+  await expect(page.locator('h1')).toContainText('question 1 of 6');
+  await expect(page.locator('main')).toContainText(/scholarship|beca|won/i);
+  await page.getByRole('link', { name: 'ShareSafe Practice' }).click();
+  await page.locator('input[name=pack][value=fractions]').check();
+  await startPre(page);
+  await doFracCheck(page, 'pre', 2);
+  await expect(page.locator('h1')).toHaveText('Pre-check done');
+  await expect(page.locator('.big')).toContainText('2 of 6');
+});
+
+test('teacher pack builder: byte counter, export, and try a pack', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Teacher pack builder' }).first().click();
+  await expect(page.locator('h1')).toHaveText('Teacher pack builder', { timeout: 15_000 });
+  await page.locator('#b-title').fill('Library Wi-Fi quiz');
+  await page.locator('#b-id').fill('wifi-quiz');
+  // Fill the first pre, practice and post prompts + two choices so the pack validates.
+  const fillQ = async (sec: string, prompt: string) => {
+    const card = page.locator(`[data-sec=${sec}] .q-card`).first();
+    await card.locator('[data-f=prompt]').fill(prompt);
+    await card.locator('[data-f=c0]').fill('Yes');
+    await card.locator('[data-f=c1]').fill('No');
+  };
+  await fillQ('pre', 'Should you share your password on library Wi-Fi?');
+  await fillQ('practice', 'A classmate asks for your login on a shared PC. What do you do?');
+  await fillQ('post', 'Is a public computer a good place to stay signed in?');
+  await expect(page.locator('.byte')).toContainText(/Pack JSON: [1-9]/);
+  await expect(page.locator('.byte')).toContainText(/printed QR|Share link: [1-9]/);
+  await expect(page.locator('.byte')).not.toContainText('too large');
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: 'Download pack JSON' }).click(),
+  ]);
+  expect(download.suggestedFilename()).toMatch(/wifi-quiz\.json/);
+  await page.getByRole('button', { name: 'Try this pack now' }).click();
+  await expect(page.locator('h1')).toContainText('question 1 of 1', { timeout: 15_000 });
+  await expect(page.locator('main')).toContainText('library Wi-Fi');
 });

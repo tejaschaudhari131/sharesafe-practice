@@ -59,3 +59,39 @@ th,td{border:1px solid var(--line);padding:.4rem .6rem;text-align:left}
 .plan li{margin:.25rem 0}
 details summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-weight:600}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+.packs{display:grid;gap:.75rem;margin:1rem 0}
+.pack{display:block;border:2px solid var(--line);border-radius:.5rem;padding:.75rem 1rem;background:var(--bg);cursor:pointer;min-height:44px}
+.pack:has(input:checked),html.hc .pack:has(input:checked){border-color:var(--pri);background:var(--card)}
+.pack input{margin-right:.6rem;flex:none}
+.pack-title{font-weight:700;display:block;margin:.1rem 0}
+.pack-desc{color:var(--muted);margin:.25rem 0 0;font-weight:400}
+.mock{border:2px solid var(--line);border-radius:.5rem;margin:1rem 0;overflow:hidden;background:var(--bg)}
+.mock-bar{display:flex;align-items:center;gap:.5rem;padding:.4rem .75rem;border-bottom:1px solid var(--line);background:var(--card);font-family:ui-monospace,Consolas,monospace;font-size:.9rem;word-break:break-all}
+.mock-dots{display:inline-block;letter-spacing:.2em;color:var(--muted);padding-right:.4rem}
+.mock-status{font-size:1.6rem;font-weight:700;margin:.75rem 1rem .25rem}
+.mock-msg{margin:.25rem 1rem 1rem}
+.mail{border:2px solid var(--line);border-radius:.5rem;padding:.75rem 1rem;margin:1rem 0;background:var(--card)}
+.mail-meta{margin:.35rem 0;word-break:break-word}
+.mail-body{white-space:pre-wrap;margin:.75rem 0 0;font-family:inherit}
+.badge{display:inline-block;font-size:.9rem;font-weight:700;border:2px solid var(--line);border-radius:.3rem;padding:.2rem .5rem;margin:.25rem 0}
+.prewrap{white-space:pre-wrap}
+.access{display:flex;flex-direction:column;gap:.75rem;margin:1rem 0}
+.access fieldset{margin:0}
+.flags,.hints,.steps{margin:.5rem 0 1rem}
+#builder-errors{color:var(--warn)}
+.byte{font-variant-numeric:tabular-nums}
+.q-card{border:2px solid var(--line);border-radius:.5rem;padding:.75rem 1rem;margin:.75rem 0}
+.handout{padding:1rem}
+.handout .qr-svg{width:min(280px,70vw);margin:1rem auto}
+@media print{
+  .skip,.top,.foot,.net,.no-print,button,form,nav{display:none!important}
+  main{max-width:none;padding:0}
+  .handout, .handout *{display:block!important;color:#000;background:#fff}
+  .handout .qr-svg,.handout svg{display:block!important}
+  a{color:#000;text-decoration:none}
+  @page{margin:1.5cm}
+}
+textarea,select{font:inherit;min-height:44px;padding:.4rem .6rem;border:2px solid var(--line);border-radius:.3rem;background:var(--bg);color:var(--fg);width:100%;max-width:40rem}
+textarea{min-height:6rem;resize:vertical}
+.wide{width:100%;max-width:40rem}
+#pack-file{width:auto;min-height:44px}

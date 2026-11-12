@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ShareSafe Practice: private, offline fractions practice</title>
-  <meta name="description" content="Free, offline-first fractions practice for shared and low-end devices. No accounts, no tracking.">
+  <title>ShareSafe Practice: private, offline digital-safety lessons</title>
+  <meta name="description" content="Free, offline-first digital-safety lessons for shared and low-end devices. No accounts, no tracking.">
   <meta name="theme-color" content="#0b4f8a">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
@@ -14,10 +14,11 @@
   <a class="skip" href="#main">Skip to main content</a>
   <header class="top">
     <a class="brand" href="./" data-go="home">ShareSafe Practice</a>
-    <div class="toolbar" role="group" aria-label="Display and reading options">
+    <div class="toolbar" role="group" aria-label="Display, language and reading options">
       <button type="button" id="t-size" class="secondary">Text size: Normal</button>
       <button type="button" id="t-contrast" class="secondary" aria-pressed="false">High contrast</button>
       <button type="button" id="t-plain" class="secondary" aria-pressed="false">Plain language</button>
+      <button type="button" id="t-lang" class="secondary" lang="en">English</button>
     </div>
   </header>
   <p id="net" class="net" role="status" hidden></p>
@@ -25,12 +26,13 @@
   <footer class="foot">
     <p><span id="mode-status"></span> <span id="sw-status"></span></p>
     <div class="row">
-      <button type="button" class="secondary" data-go="code">Resume code</button>
-      <button type="button" class="danger" data-go="end">End session</button>
-      <button type="button" class="link" data-go="about">About &amp; credits</button>
+      <button type="button" class="secondary" data-go="code" id="f-code">Resume code</button>
+      <button type="button" class="danger" data-go="end" id="f-end">End session</button>
+      <button type="button" class="link" data-go="builder" id="f-builder">Teacher pack builder</button>
+      <button type="button" class="link" data-go="about" id="f-about">About &amp; credits</button>
     </div>
   </footer>
-  <noscript><p>ShareSafe Practice needs JavaScript to generate practice problems.</p></noscript>
+  <noscript><p>ShareSafe Practice needs JavaScript to run the lessons.</p></noscript>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

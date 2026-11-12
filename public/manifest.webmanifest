@@ -1,7 +1,7 @@
 {
   "name": "ShareSafe Practice",
   "short_name": "ShareSafe",
-  "description": "Private, offline-first fractions practice. No accounts.",
+  "description": "Private, offline-first digital-safety lessons. No accounts.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

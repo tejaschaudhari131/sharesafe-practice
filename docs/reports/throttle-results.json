@@ -1,12 +1,12 @@
 {
   "Regular 2G (250 kbps, 300 ms RTT)": {
-    "usableMs": 1168,
-    "offlineReadyMs": 1968,
-    "uncompressedBytesSeen": 42376
+    "usableMs": 1680,
+    "offlineReadyMs": 1973,
+    "uncompressedBytesSeen": 86065
   },
   "Slow 3G (400 kbps, 400 ms RTT)": {
-    "usableMs": 1249,
-    "offlineReadyMs": 2041,
-    "uncompressedBytesSeen": 42376
+    "usableMs": 1752,
+    "offlineReadyMs": 1940,
+    "uncompressedBytesSeen": 86065
   }
 }

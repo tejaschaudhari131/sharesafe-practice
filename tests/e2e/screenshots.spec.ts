@@ -1,6 +1,6 @@
 // Generates docs/screenshots/*. Run with: SCREENSHOTS=1 npx playwright test screenshots
 import { expect, test, type Page } from '@playwright/test';
-import { answerByKeyboard, currentPracticeProblem, doCheck } from './helpers';
+import { accessItem, answerAccessByKeyboard, doCheck, startPre } from './helpers';
 
 test.skip(!process.env.SCREENSHOTS, 'set SCREENSHOTS=1 to regenerate screenshots');
 
@@ -14,18 +14,14 @@ for (const [label, viewport] of [['desktop', { width: 1280, height: 800 }], ['mo
     await page.goto('/');
     await expect(page.locator('#sw-status')).toHaveText('Ready to work offline.', { timeout: 15000 });
     await shot(page, `${label}-01-home`);
-    await page.locator('button[data-go=start]').click();
+    await startPre(page);
     await shot(page, `${label}-02-precheck`);
     await doCheck(page, 'pre', 3);
+    await shot(page, `${label}-03-403-intro`);
     await page.locator('button[data-go=begin-practice]').click();
-    await page.locator('button[data-skill=addsub]').click();
     await page.locator('#hint-btn').click(); await page.locator('#hint-btn').click();
-    await page.locator('#a-n').focus();
-    await shot(page, `${label}-03-practice-hints`);
-    await page.locator('#steps-btn').click();
-    await shot(page, `${label}-04-worked-steps`);
-    await page.locator('#next-btn').click();
-    await answerByKeyboard(page, await currentPracticeProblem(page, 'addsub'));
+    await shot(page, `${label}-04-access-hints`);
+    await answerAccessByKeyboard(page, accessItem('roster'));
     await shot(page, `${label}-05-correct-feedback`);
     await page.locator('main button[data-go=code]').click();
     await page.locator('.qr-svg').waitFor();
@@ -35,14 +31,12 @@ for (const [label, viewport] of [['desktop', { width: 1280, height: 800 }], ['mo
     await shot(page, `${label}-07-end-session`);
     await page.locator('#wipe').click();
     await shot(page, `${label}-08-session-ended`);
-    // High contrast + extra-large text + plain language
     await page.locator('button[data-go=home]').click();
     await page.locator('#t-size').click(); await page.locator('#t-size').click();
     await page.locator('#t-contrast').click(); await page.locator('#t-plain').click();
-    await page.locator('button[data-go=start]').click();
+    await startPre(page);
     await shot(page, `${label}-09-high-contrast-large-plain`);
     await page.locator('#t-size').click(); await page.locator('#t-contrast').click(); await page.locator('#t-plain').click();
-    // Offline
     await page.reload();
     await ctx.setOffline(true);
     await page.reload();
@@ -52,12 +46,30 @@ for (const [label, viewport] of [['desktop', { width: 1280, height: 800 }], ['mo
   });
 }
 
-test('results view (desktop)', async ({ page }) => {
+test('results, builder, Spanish, and scam (desktop)', async ({ page }) => {
   await page.goto('/');
-  await page.locator('button[data-go=start]').click();
+  await startPre(page);
   await doCheck(page, 'pre', 2);
   await page.locator('button[data-go=begin-practice]').click();
   await page.locator('main button[data-go=post]').click();
   await doCheck(page, 'post', 6);
   await shot(page, 'desktop-11-results-before-after');
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Teacher pack builder' }).first().click();
+  await expect(page.locator('h1')).toHaveText('Teacher pack builder', { timeout: 15_000 });
+  await shot(page, 'desktop-12-builder');
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'English' }).click();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'es');
+  await shot(page, 'desktop-13-spanish');
+
+  await page.getByRole('button', { name: 'Español' }).click();
+  await page.locator('input[name=pack][value=scam]').check();
+  await startPre(page);
+  await doCheck(page, 'pre', 6, (await import('../../src/packs/scam')).pack.pre);
+  await page.locator('button[data-go=begin-practice]').click();
+  await expect(page.locator('.mail')).toBeVisible();
+  await shot(page, 'desktop-14-scam-message');
 });
