@@ -47,7 +47,7 @@ p .fv,li .fv{font-size:.9em}
 .ok{color:var(--ok);font-weight:700}.warn{color:var(--warn);font-weight:700}
 .hint-text{color:var(--muted)}
 .big{font-size:1.3rem}
-.code{font-family:ui-monospace,Consolas,"Courier New",monospace;font-size:1.6rem;font-weight:700;letter-spacing:.12em;word-break:break-all;background:var(--card);border:2px solid var(--line);padding:.5rem .75rem;border-radius:.4rem;display:inline-block}
+.code{font-family:ui-monospace,Consolas,"Courier New",monospace;font-size:1.6rem;font-weight:700;letter-spacing:.12em;overflow-wrap:anywhere;word-break:break-word;background:var(--card);border:2px solid var(--line);padding:.5rem .75rem;border-radius:.4rem;display:block;max-width:100%;box-decoration-break:clone}
 .code.small{font-size:1.1rem}
 .qr{margin:1rem 0}.qr-svg{width:min(240px,70vw);height:auto;display:block;border:1px solid var(--line)}
 progress{width:100%;height:1rem;accent-color:var(--pri)}
@@ -84,14 +84,42 @@ details summary{cursor:pointer;min-height:44px;display:flex;align-items:center;f
 .handout{padding:1rem}
 .handout .qr-svg{width:min(280px,70vw);margin:1rem auto}
 @media print{
-  .skip,.top,.foot,.net,.no-print,button,form,nav{display:none!important}
-  main{max-width:none;padding:0}
-  .handout, .handout *{display:block!important;color:#000;background:#fff}
-  .handout .qr-svg,.handout svg{display:block!important}
+  @page{margin:1.2cm;size:letter}
+  body{background:#fff;color:#000}
+  .skip,.top,.foot,.net,.no-print,button,form,nav,.toolbar,#escape-live,#storage-badge{display:none!important}
+  main{max-width:none;padding:0;min-height:0}
+  .handout{display:block!important;color:#000;background:#fff;padding:0;max-width:40rem;margin:0 auto}
+  .handout *{color:#000;background:#fff}
+  .handout h1{font-size:22pt;margin:0 0 .6rem;page-break-after:avoid}
+  .handout p{font-size:12pt;line-height:1.4;margin:.4rem 0}
+  .handout .qr-svg,.handout svg{display:block!important;width:70mm;height:auto;margin:12mm auto;border:1px solid #000}
+  .handout .handout-url{word-break:break-all;overflow-wrap:anywhere;font-family:ui-monospace,Consolas,monospace;font-size:10pt;border:1px solid #000;padding:.6rem}
   a{color:#000;text-decoration:none}
-  @page{margin:1.5cm}
 }
+@media (forced-colors:active){
+  button,.pack,.card,fieldset,.code,.mock,.mail,input,textarea,select,.badge,.handout,.storage-badge,.mastery{border:2px solid ButtonText}
+  :focus-visible{outline:3px solid Highlight;outline-offset:3px}
+  .bars rect{stroke:CanvasText;stroke-width:2}
+  .bars .on{fill:Highlight}.bars .off{fill:Canvas}
+  .ok,.warn{forced-color-adjust:auto;font-weight:700}
+}
+.storage-badge{font-size:.95rem;margin:.5rem 0 0;padding:.5rem .75rem;border:1px solid var(--line);border-radius:.4rem;background:var(--card);color:var(--fg);overflow-wrap:anywhere}
+.mastery{border:2px solid var(--pri);border-radius:.5rem;padding:.75rem 1rem;margin:1.25rem 0;background:var(--card)}
+.mastery .big{margin:.4rem 0}
+.pack-group{margin:1.25rem 0 0}
+.pack-group>legend{font-size:1.05rem}
+@media (max-width:320px){
+  main,.top,.foot,.net{padding:.6rem}
+  h1{font-size:1.35rem}
+  .math{font-size:1.5rem}
+  .toolbar button{padding:.4rem .55rem}
+}
+
 textarea,select{font:inherit;min-height:44px;padding:.4rem .6rem;border:2px solid var(--line);border-radius:.3rem;background:var(--bg);color:var(--fg);width:100%;max-width:40rem}
 textarea{min-height:6rem;resize:vertical}
 .wide{width:100%;max-width:40rem}
-#pack-file{width:auto;min-height:44px}
+#pack-file{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;white-space:nowrap}
+
+input,select,textarea,.wide,.code,fieldset,.pack,.row,.toolbar{max-width:100%;min-width:0}
+.pack-title,.pack-desc,p,h1,h2,li{overflow-wrap:anywhere}
+label.check[for=pack-file]{display:inline-flex;border:2px solid var(--pri);border-radius:.4rem;padding:.5rem 1rem;min-height:44px;color:var(--pri);cursor:pointer;max-width:100%}

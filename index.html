@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ShareSafe Practice: private, offline digital-safety lessons</title>
-  <meta name="description" content="Free, offline-first digital-safety lessons for shared and low-end devices. No accounts, no tracking.">
+  <title>ShareSafe Practice: Digital Survival Curriculum, private and offline</title>
+  <meta name="description" content="Digital Survival Curriculum for shared and low-end devices. No accounts, works offline, private by default. Teachers can hand out a pack with a QR code.">
   <meta name="theme-color" content="#0b4f8a">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
@@ -23,11 +23,13 @@
   </header>
   <p id="net" class="net" role="status" hidden></p>
   <main id="main" tabindex="-1"></main>
+  <p id="escape-live" class="sr-only" role="status" aria-live="polite"></p>
   <footer class="foot">
     <p><span id="mode-status"></span> <span id="sw-status"></span></p>
+    <p id="storage-badge" class="storage-badge" role="status" data-persistent-bytes="0"></p>
     <div class="row">
       <button type="button" class="secondary" data-go="code" id="f-code">Resume code</button>
-      <button type="button" class="danger" data-go="end" id="f-end">End session</button>
+      <button type="button" class="danger" data-go="end" id="f-end">Wipe session</button>
       <button type="button" class="link" data-go="builder" id="f-builder">Teacher pack builder</button>
       <button type="button" class="link" data-go="about" id="f-about">About &amp; credits</button>
     </div>

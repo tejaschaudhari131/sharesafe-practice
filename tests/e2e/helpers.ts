@@ -77,19 +77,19 @@ export async function answerByKeyboard(page: Page, p: Problem, wrong = false) {
 
 export async function startPre(page: Page) {
   await page.locator('button[data-go=start]').click();
-  await expect(page.locator('h1')).toContainText(/question 1 of 6/, { timeout: 15_000 });
+  await expect(page.locator('h1')).toContainText(/question 1 of 2|pregunta 1 de 2/, { timeout: 15_000 });
 }
 
-export async function doCheck(page: Page, kind: 'pre' | 'post', correct = 6, items: Item[] = permission[kind]) {
+export async function doCheck(page: Page, kind: 'pre' | 'post', correct = 2, items: Item[] = permission[kind]) {
   for (let i = 0; i < items.length; i++) {
     await expect(page.locator('h1')).toContainText(`question ${i + 1} of ${items.length}`);
     await answerChoiceByKeyboard(page, items[i], i >= correct);
   }
 }
 
-export async function doFracCheck(page: Page, kind: 'pre' | 'post', correct = 6) {
-  for (let i = 0; i < 6; i++) {
-    await expect(page.locator('h1')).toContainText(`question ${i + 1} of 6`);
+export async function doFracCheck(page: Page, kind: 'pre' | 'post', correct = 2) {
+  for (let i = 0; i < 2; i++) {
+    await expect(page.locator('h1')).toContainText(`question ${i + 1} of 2`);
     const prog = await getProgress(page);
     await answerByKeyboard(page, checkProblem(prog.seed, i, kind), i >= correct);
   }

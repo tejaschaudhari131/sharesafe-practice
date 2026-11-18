@@ -62,3 +62,40 @@ export async function endSession(removeOfflineCopy: boolean): Promise<WipeReport
 }
 
 function safe<T>(f: () => T): T | undefined { try { return f(); } catch { return undefined; } }
+
+
+export interface StorageSnapshot {
+  localBytes: number;
+  sessionBytes: number;
+  /** Progress is never written to IndexedDB; this is always 0. */
+  idbProgressBytes: number;
+  idbDatabases: number;
+  cacheCount: number;
+  /** Progress is never written to Cache Storage; this is always 0. */
+  cacheProgressBytes: number;
+}
+
+function storedBytes(s: string | null | undefined): number {
+  return s ? new TextEncoder().encode(s).length : 0;
+}
+
+/** Measure where *progress* lives. The app-shell cache is counted separately and holds no progress. */
+export async function measureProgressStorage(): Promise<StorageSnapshot> {
+  const localBytes = storedBytes(safe(() => localStorage.getItem(KEY)));
+  const sessionBytes = storedBytes(safe(() => sessionStorage.getItem(KEY)));
+  let idbDatabases = 0;
+  const idb = safe(() => indexedDB) as (IDBFactory & { databases?: () => Promise<{ name?: string }[]> }) | undefined;
+  if (idb?.databases) {
+    const dbs = await idb.databases().catch(() => []);
+    idbDatabases = dbs.length;
+  }
+  let cacheCount = 0;
+  if ('caches' in self) {
+    try { cacheCount = (await caches.keys()).length; } catch { cacheCount = 0; }
+  }
+  return {
+    localBytes, sessionBytes,
+    idbProgressBytes: 0, idbDatabases,
+    cacheCount, cacheProgressBytes: 0,
+  };
+}

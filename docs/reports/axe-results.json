@@ -96,7 +96,32 @@
   },
   "default: builder": {
     "violations": 0,
-    "passes": 44,
+    "passes": 45,
+    "ids": []
+  },
+  "default: mastery": {
+    "violations": 0,
+    "passes": 43,
+    "ids": []
+  },
+  "default: teacher-verify": {
+    "violations": 0,
+    "passes": 45,
+    "ids": []
+  },
+  "spanish: fractions-pre": {
+    "violations": 0,
+    "passes": 43,
+    "ids": []
+  },
+  "emulated-320-forced-colors: home": {
+    "violations": 0,
+    "passes": 43,
+    "ids": []
+  },
+  "emulated-320-forced-colors: resume-code": {
+    "violations": 0,
+    "passes": 40,
     "ids": []
   }
 }

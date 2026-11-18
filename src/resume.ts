@@ -9,6 +9,8 @@
 // because the code only drives self-practice; it isn't a grade or a credential.
 // Codes contain no personal data: just a pack hash, a random problem seed and counters.
 
+import { BUILTIN_IDS, packHash, type BuiltinId } from './pack';
+
 export interface SkillProgress { correct: number; attempts: number }
 export interface Progress {
   packHash: number;    // 0..1023, identifies the lesson pack
@@ -135,4 +137,41 @@ function same(a: Progress, b: Progress): boolean {
   const flat = (p: Progress) => [p.packHash, p.seed, p.stage, p.preCount, p.preMask, p.postCount, p.postMask, p.hints,
     ...p.skills.flatMap((s) => [s.correct, s.attempts])].join(',');
   return flat(a) === flat(b);
+}
+
+
+export function bitCount(mask: number): number {
+  let c = 0;
+  let m = mask >>> 0;
+  while (m) { c += m & 1; m >>= 1; }
+  return c;
+}
+
+export interface CodeSummary {
+  packHash: number;
+  pre: number;
+  post: number;
+  preCount: number;
+  postCount: number;
+  stage: number;
+}
+
+export function summarize(progress: Progress): CodeSummary {
+  const p = normalize(progress);
+  return {
+    packHash: p.packHash,
+    pre: bitCount(p.preMask),
+    post: bitCount(p.postMask),
+    preCount: p.preCount,
+    postCount: p.postCount,
+    stage: p.stage,
+  };
+}
+
+/** Known built-in pack ids from a 10-bit pack hash (built-in hashes are of the id only). */
+export function builtinIdFromHash(hash: number): BuiltinId | null {
+  for (const id of BUILTIN_IDS) {
+    if (packHash({ id }) === (hash & 0x3ff)) return id;
+  }
+  return null;
 }

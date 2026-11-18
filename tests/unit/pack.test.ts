@@ -13,10 +13,10 @@ describe('built-in packs', () => {
   });
 
   for (const p of [permission, scam]) {
-    it(`${p.id}: pre and post have 6 questions, each with one valid answer and an explanation`, () => {
-      expect(p.checkLength).toBe(6);
-      expect(p.pre).toHaveLength(6);
-      expect(p.post).toHaveLength(6);
+    it(`${p.id}: pre and post have 2 isomorphic questions, each with one valid answer and an explanation`, () => {
+      expect(p.checkLength).toBe(2);
+      expect(p.pre).toHaveLength(2);
+      expect(p.post).toHaveLength(2);
       for (const item of [...p.pre, ...p.post]) {
         expect(item.kind).toBe('choice');
         expect(item.choices!.length).toBeGreaterThanOrEqual(2);
@@ -28,6 +28,7 @@ describe('built-in packs', () => {
         expect(gradeItem(item, { choice: other }).correct).toBe(false);
         expect(gradeItem(item, {}).invalid).toBe('choice');
       }
+      expect(p.pre.map((i) => i.skill)).toEqual(p.post.map((i) => i.skill));
       expect(p.pre.map((i) => i.prompt.en.std)).not.toEqual(p.post.map((i) => i.prompt.en.std));
     });
   }
@@ -56,6 +57,13 @@ describe('built-in packs', () => {
       expect(item.flags!.length).toBeGreaterThanOrEqual(2);
       expect(item.message?.from).toMatch(/\.example/);
     }
+  });
+
+  it('Everyday Fractions is a bilingual 2-item teacher-pack demo', () => {
+    expect(fractions.checkLength).toBe(2);
+    expect(fractions.title.en.std).toMatch(/Everyday Fractions/);
+    expect(fractions.title.es?.std).toBeTruthy();
+    expect(fractions.description.es?.std).toBeTruthy();
   });
 
   it('every catalog loader returns the pack with the same id', async () => {

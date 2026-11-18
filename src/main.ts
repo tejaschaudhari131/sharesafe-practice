@@ -6,8 +6,8 @@ import {
   validatePack,
 } from './pack';
 import { gradeItem } from './grade';
-import { decode, encode, newProgress, normalizeInput, type Progress } from './resume';
-import { defaultSettings, endSession, load, save, type Settings } from './storage';
+import { decode, encode, newProgress, normalizeInput, bitCount, summarize, type Progress } from './resume';
+import { defaultSettings, endSession, load, save, measureProgressStorage, type Settings } from './storage';
 
 // ---------- state ----------
 const saved = load();
@@ -31,9 +31,23 @@ const lang = () => settings.lang;
 const plain = () => settings.plain;
 const T = (key: StrKey, vars?: Record<string, string | number>) => t(key, lang(), plain(), vars);
 const tx = (text: LText) => pickText(text, lang(), plain());
-const bitsCount = (m: number) => { let c = 0; while (m) { c += m & 1; m >>= 1; } return c; };
+const bitsCount = bitCount;
 
-function persist() { save(settings, packId, progress, customPack); }
+function persist() {
+  save(settings, packId, progress, customPack);
+  void updateStorageBadge();
+}
+
+function txHTML(text: LText): string {
+  const used: Lang = (lang() === 'es' && text.es) ? 'es' : 'en';
+  const loc = used === 'es' ? text.es! : text.en;
+  const s = esc(plain() ? loc.plain : loc.std);
+  return used === lang() ? s : `<span lang="${used}">${s}</span>`;
+}
+
+function enAttr(s: string): string {
+  return lang() === 'en' ? esc(s) : `<span lang="en">${esc(s)}</span>`;
+}
 
 const packCache: Partial<Record<BuiltinId, Pack>> = {};
 async function loadBuiltin(id: BuiltinId): Promise<Pack> {
@@ -82,6 +96,12 @@ function applySettings() {
   $('#f-builder').textContent = T('builderLink');
   $('#f-about').textContent = T('about');
   $('#mode-status').textContent = settings.saveOnDevice ? T('savingOn') : T('noTrace');
+  const sw = $('#sw-status');
+  if (sw.textContent) {
+    const fails = [t('swFail', 'en', false), t('swFail', 'es', false)];
+    sw.textContent = fails.includes(sw.textContent) ? T('swFail') : T('swReady');
+  }
+  void updateStorageBadge();
 }
 
 // ---------- speech ----------
@@ -110,9 +130,11 @@ function show(name: string, html: string, focus = true) {
 }
 
 function contentLangNote(p: Pack): string {
-  const sample = p.pre[0]?.prompt ?? p.intro?.title;
-  if (settings.lang === 'es' && (isGenerated(p.practice) || (sample && !hasLocale(sample, 'es')))) {
-    return `<p class="hint-text" role="note">${esc(T('contentInEn'))}</p>`;
+  if (settings.lang !== 'es') return '';
+  if (isGenerated(p.practice)) return '';
+  const sample = p.pre[0]?.prompt ?? p.intro?.title ?? p.title;
+  if (sample && !hasLocale(sample, 'es')) {
+    return `<p class="hint-text" role="note" lang="en">${esc(T('contentInEn'))}</p>`;
   }
   return '';
 }
@@ -120,19 +142,28 @@ function contentLangNote(p: Pack): string {
 function home(focus = true) {
   const h = currentHash();
   const started = progress.packHash === h && (progress.preCount > 0 || progress.stage > 0);
-  const packs = [
-    ...CATALOG.map((c) => ({ id: c.id, title: tx(c.title), desc: tx(c.description) })),
-    ...(customPack ? [{ id: customPack.id, title: `${tx(customPack.title)} (${T('customPack')})`, desc: tx(customPack.description) }] : []),
-  ];
+  const packLabel = (c: { id: string; title: LText | string; desc?: LText | string; description?: LText }) => {
+    const title = typeof c.title === 'string' ? esc(c.title) : txHTML(c.title);
+    const descSrc = 'desc' in c && c.desc != null ? c.desc : (c as { description?: LText }).description;
+    const desc = descSrc == null ? '' : typeof descSrc === 'string' ? esc(descSrc) : txHTML(descSrc);
+    return `<label class="pack"><input type="radio" name="pack" value="${esc(c.id)}" ${c.id === packId ? 'checked' : ''}>
+        <span><span class="pack-title">${title}</span><span class="pack-desc">${desc}</span></span></label>`;
+  };
+  const curriculum = CATALOG.filter((c) => c.group === 'curriculum');
+  const demo = CATALOG.filter((c) => c.group === 'demo');
   show('home', `
     <h1>${esc(T('homeTitle'))}</h1>
     <p>${esc(T('homeLead'))}</p>
     <ol class="plan"><li>${esc(T('plan1'))}</li></ol>
-    <fieldset class="packs">
-      <legend>${esc(T('choosePack'))}</legend>
-      ${packs.map((p) => `<label class="pack"><input type="radio" name="pack" value="${esc(p.id)}" ${p.id === packId ? 'checked' : ''}>
-        <span><span class="pack-title">${esc(p.title)}</span><span class="pack-desc">${esc(p.desc)}</span></span></label>`).join('')}
+    <fieldset class="packs pack-group">
+      <legend>${esc(T('curriculumLegend'))}</legend>
+      ${curriculum.map(packLabel).join('')}
     </fieldset>
+    <fieldset class="packs pack-group">
+      <legend>${esc(T('demoLegend'))}</legend>
+      ${demo.map(packLabel).join('')}
+    </fieldset>
+    ${customPack ? `<fieldset class="packs pack-group"><legend>${esc(T('customPack'))}</legend>${packLabel({ id: customPack.id, title: customPack.title, description: customPack.description })}</fieldset>` : ''}
     ${customPack ? `<p class="hint-text">${esc(T('packLoaded'))}: ${esc(tx(customPack.title))}</p>` : ''}
     <div class="row">
       <button type="button" data-go="${started ? 'continue' : 'start'}">${started ? esc(T('continue')) : esc(T('start'))}</button>
@@ -149,6 +180,7 @@ function home(focus = true) {
       <label class="check"><input type="checkbox" id="save-device" ${settings.saveOnDevice ? 'checked' : ''}>
         ${esc(T('saveDevice'))}</label>
       <p class="hint-text">${esc(T('saveHint'))}</p>
+      <p class="hint-text">${esc(T('wipeEscHelp'))}</p>
     </section>`, focus);
   $('#save-device', main).addEventListener('change', (e) => {
     settings.saveOnDevice = (e.target as HTMLInputElement).checked; persist(); applySettings();
@@ -286,7 +318,7 @@ function messageBlock(item: Item): string {
   const m = item.message!;
   return `<article class="mail" aria-label="${esc(T('fictional'))}">
     <p class="badge" role="note">${esc(T('fictional'))}</p>
-    <p class="mail-meta"><strong>${esc(T('fromLabel'))}:</strong> ${esc(m.from)}</p>
+    <p class="mail-meta"><strong>${esc(T('fromLabel'))}:</strong> <span lang="en">${esc(m.from)}</span></p>
     <p class="mail-meta"><strong>${esc(T('subjectLabel'))}:</strong> ${esc(tx(m.subject))}</p>
     <p class="mail-body">${esc(tx(m.body))}</p>
   </article>`;
@@ -311,9 +343,9 @@ async function check(p: Pack, kind: 'pre' | 'post') {
       ${contentLangNote(p)}
       <progress max="${len}" value="${i}" aria-label="${esc(title)}">${i} of ${len}</progress>
       <p class="hint-text">${esc(T('noHintsHere'))}</p>
-      <p class="prompt">${esc(plain() ? problem.prompt.plain : problem.prompt.std)}.</p>
+      <p class="prompt">${esc(F.pickBi(problem.prompt, lang(), plain()))}.</p>
       ${problemHTML(problem)}
-      ${speakBtn(`${plain() ? problem.prompt.plain : problem.prompt.std}. ${problem.speech}.`)}
+      ${speakBtn(`${F.pickBi(problem.prompt, lang(), plain())}. ${F.pickSpeech(problem, lang())}.`)}
       ${answerFormFrac(problem.answer.kind, T('submit'))}`);
     bindFracCheck(p, kind, problem, F);
     return;
@@ -377,7 +409,7 @@ function introHTML(p: Pack): string {
   if (!p.intro) return '';
   const mock = p.intro.mock ? `<div class="mock">
     <div class="mock-bar"><span class="mock-dots" aria-hidden="true">●●●</span><span>${esc(p.intro.mock.url)}</span></div>
-    <p class="mock-status">${esc(p.intro.mock.status)}</p>
+    <p class="mock-status" lang="en">${esc(p.intro.mock.status)}</p>
     <p class="mock-msg">${esc(tx(p.intro.mock.message))}</p>
   </div>` : '';
   return `<section aria-labelledby="intro-h">
@@ -557,14 +589,15 @@ async function fracPractice(p: Pack) {
   hintLevel = 0; answered = false;
   const ready = practiceReady(p);
   const name = tx(p.skills[si].name);
-  const prompt = plain() ? problem.prompt.plain : problem.prompt.std;
+  const prompt = F.pickBi(problem.prompt, lang(), plain());
+  const spoken = F.pickSpeech(problem, lang());
   show('practice', `
     <h1>${esc(T('practice'))}: ${esc(name)}</h1>
     ${contentLangNote(p)}
     ${skillNav(p)}
     <p class="prompt">${esc(prompt)}.</p>
     ${problemHTML(problem)}
-    <div class="row">${speakBtn(`${prompt}. ${problem.speech}.`)}</div>
+    <div class="row">${speakBtn(`${prompt}. ${spoken}.`)}</div>
     ${answerFormFrac(problem.answer.kind, T('checkAns'))}
     <div class="row">
       <button type="button" class="secondary" id="hint-btn">${esc(T('showHint'))} (1 ${esc(T('ofWord'))} ${problem.hints.length})</button>
@@ -579,7 +612,7 @@ async function fracPractice(p: Pack) {
     if (hintLevel >= problem.hints.length) return;
     hintLevel++;
     progress.hints = Math.min(31, progress.hints + 1); persist();
-    const ht = problem.hints.slice(0, hintLevel).map((h) => plain() ? h.plain : h.std);
+    const ht = problem.hints.slice(0, hintLevel).map((h) => F.pickBi(h, lang(), plain()));
     help.innerHTML = `<h2>${esc(T('hintsH'))}</h2>` + barsHTML(problem) +
       `<ol class="hints">${ht.map((h) => `<li>${mathText(h)}</li>`).join('')}</ol>` +
       speakBtn(ht[hintLevel - 1], T('readHint'));
@@ -587,7 +620,7 @@ async function fracPractice(p: Pack) {
     else hintBtn.textContent = `${T('showHint')} (${hintLevel + 1} ${T('ofWord')} ${problem.hints.length})`;
   });
   $('#steps-btn', main).addEventListener('click', () => {
-    const steps = problem.steps.map((s) => plain() ? s.plain : s.std);
+    const steps = problem.steps.map((s) => F.pickBi(s, lang(), plain()));
     help.innerHTML = `<h2>${esc(T('stepsH'))}</h2>${barsHTML(problem)}
       <ol class="steps">${steps.map((s) => `<li>${mathText(s)}</li>`).join('')}</ol>
       <p>${esc(T('answerWord'))}: <strong>${mathText(F.answerText(problem.answer))}</strong></p>
@@ -633,8 +666,8 @@ function results(p: Pack) {
   const pre = bitsCount(progress.preMask), post = bitsCount(progress.postMask);
   const len = p.checkLength;
   const per = (mask: number, k: number) => {
-    // Fractions: 2 questions per skill at indices k and k+3. Other packs: no per-skill pre/post split.
-    if (isGenerated(p.practice)) return bitsCount(mask & ((1 << k) | (1 << (k + 3))));
+    // Fractions: item 0 is equiv, item 1 is addsub. Compare is practice-only.
+    if (isGenerated(p.practice)) return k <= 1 ? bitsCount(mask & (1 << k)) : null;
     return null;
   };
   const diff = post - pre;
@@ -645,10 +678,16 @@ function results(p: Pack) {
   }).join('');
   const skillHead = isGenerated(p.practice)
     ? `<th scope="col">${esc(T('preTitle'))}</th><th scope="col">${esc(T('postTitle'))}</th>` : '';
+  const code = encode(progress);
+  const delta = diff > 0 ? ` <span class="ok">(+${diff})</span>` : diff < 0 ? ` (${diff})` : '';
   show('results', `
     <h1>${esc(T('results'))}</h1>
-    <p class="big">${esc(T('before'))}: <strong>${pre}/${len}</strong> → ${esc(T('after'))}: <strong>${post}/${len}</strong>
-      ${diff > 0 ? `<span class="ok">(+${diff})</span>` : ''}</p>
+    <section class="mastery" aria-labelledby="mastery-h">
+      <h2 id="mastery-h">${esc(T('masteryTitle'))}</h2>
+      <p class="big">${esc(T('before'))}: <strong>${pre}/${len}</strong> → ${esc(T('after'))}: <strong>${post}/${len}</strong>${delta}</p>
+      <p>${esc(T('masteryNote'))}</p>
+      <p>${esc(T('completionCode'))}: <span class="code small" id="completion-code">${code}</span></p>
+    </section>
     <table>
       <caption>${esc(T('bySkill'))}${isGenerated(p.practice) ? ' (2 / 2)' : ''}</caption>
       <thead><tr><th scope="col">${esc(T('skillH'))}</th>${skillHead}<th scope="col">${esc(T('practiceCorrect'))}</th></tr></thead>
@@ -780,6 +819,7 @@ function openBuilder() {
   import('./builder').then((m) => {
     m.showBuilder({
       main, t: T, esc, lang: lang(),
+      customPack,
       onHome: () => go('home'),
       onTry: (p: Pack) => { customPack = p; packId = p.id; pack = p; progress = newProgress(packHash(p)); persist(); go('start'); },
     });
@@ -857,6 +897,46 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
   }).catch(() => { $('#sw-status').textContent = T('swFail'); });
 }
 
+
+async function updateStorageBadge() {
+  const el = document.getElementById('storage-badge');
+  if (!el) return;
+  const s = await measureProgressStorage();
+  const persistent = s.localBytes + s.idbProgressBytes + s.cacheProgressBytes;
+  el.setAttribute('data-persistent-bytes', String(persistent));
+  el.setAttribute('data-session-bytes', String(s.sessionBytes));
+  const parts: string[] = [];
+  if (settings.saveOnDevice) parts.push(T('storageSaved', { n: s.localBytes }));
+  else parts.push(T('storageZero'));
+  if (!settings.saveOnDevice && s.sessionBytes) parts.push(T('storageTab', { n: s.sessionBytes }));
+  parts.push(T('storageShell'));
+  if (s.idbDatabases) parts.push(T('storageIdbLeft', { n: s.idbDatabases }));
+  el.textContent = parts.join(' ');
+}
+
+let escArmed = false;
+let escTimer = 0;
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const live = document.getElementById('escape-live');
+  if (view === 'end' || view === 'ended') return;
+  e.preventDefault();
+  if (escArmed) {
+    escArmed = false;
+    window.clearTimeout(escTimer);
+    if (live) live.textContent = T('wipeEscGo');
+    go('end');
+    return;
+  }
+  escArmed = true;
+  if (live) live.textContent = T('wipeEscHint');
+  window.clearTimeout(escTimer);
+  escTimer = window.setTimeout(() => {
+    escArmed = false;
+    if (live && live.textContent === T('wipeEscHint')) live.textContent = '';
+  }, 2000);
+});
+
 // ---------- boot ----------
 function handleHash(initial = false) {
   const hash = location.hash;
@@ -877,4 +957,5 @@ function handleHash(initial = false) {
 }
 applySettings();
 handleHash(true);
+void updateStorageBadge();
 addEventListener('hashchange', () => handleHash());

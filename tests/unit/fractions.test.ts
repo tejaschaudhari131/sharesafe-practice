@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CHECK_LEN, SKILLS, checkProblem, cmp, fracEq, gcd, generate, grade, lcm, simplify, type Frac } from '../../src/fractions';
+import { CHECK_LEN, CHECK_SKILLS, SKILLS, checkProblem, cmp, fracEq, gcd, generate, grade, lcm, simplify, type Frac } from '../../src/fractions';
 
 const val = (f: Frac) => f.n / f.d;
 
@@ -59,11 +59,18 @@ describe('problem generation', () => {
     expect(seen).toEqual(new Set(['<', '>', '=']));
   });
 
-  it('pre and post checks have 2 of each skill and differ from each other', () => {
+  it('pre and post checks are 2 isomorphic items (same skills, new numbers) with Spanish text', () => {
+    expect(CHECK_LEN).toBe(2);
     const pre = Array.from({ length: CHECK_LEN }, (_, i) => checkProblem(42, i, 'pre'));
     const post = Array.from({ length: CHECK_LEN }, (_, i) => checkProblem(42, i, 'post'));
-    for (const s of SKILLS) expect(pre.filter((p) => p.skill === s)).toHaveLength(2);
+    expect(pre.map((p) => p.skill)).toEqual(CHECK_SKILLS);
+    expect(post.map((p) => p.skill)).toEqual(CHECK_SKILLS);
     expect(pre.map((p) => JSON.stringify(p.parts))).not.toEqual(post.map((p) => JSON.stringify(p.parts)));
+    for (const p of [...pre, ...post]) {
+      expect(p.prompt.es.std.length).toBeGreaterThan(8);
+      expect(p.speech.es.length).toBeGreaterThan(4);
+      expect(p.hints[0].es.std.length).toBeGreaterThan(4);
+    }
   });
 });
 

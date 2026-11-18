@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CODE_LEN, crc10, decode, encode, newProgress, normalize, normalizeInput, type Progress } from '../../src/resume';
+import { CODE_LEN, builtinIdFromHash, crc10, decode, encode, newProgress, normalize, normalizeInput, summarize, type Progress } from '../../src/resume';
 import { rng } from '../../src/fractions';
 
 const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
@@ -99,5 +99,20 @@ describe('resume code', () => {
     expect(encode(a)).not.toBe(encode(b));
     const d = decode(encode(a));
     expect(d.ok && d.progress.packHash).toBe(11);
+  });
+
+  it('summarizes pre/post scores for teacher verify, with no PII fields', async () => {
+    const p = normalize({
+      packHash: 7, seed: 9, stage: 3, preCount: 2, preMask: 0b01, postCount: 2, postMask: 0b11,
+      skills: [{ correct: 1, attempts: 2 }, { correct: 0, attempts: 1 }, { correct: 0, attempts: 0 }], hints: 3,
+    });
+    const s = summarize(p);
+    expect(s).toEqual({ packHash: 7, pre: 1, post: 2, preCount: 2, postCount: 2, stage: 3 });
+    expect('name' in s).toBe(false);
+    const { packHash } = await import('../../src/pack');
+    expect(builtinIdFromHash(packHash({ id: 'permission' }))).toBe('permission');
+    expect(builtinIdFromHash(packHash({ id: 'scam' }))).toBe('scam');
+    expect(builtinIdFromHash(packHash({ id: 'fractions' }))).toBe('fractions');
+    expect(builtinIdFromHash(0) === 'permission' || builtinIdFromHash(0) === 'scam' || builtinIdFromHash(0) === 'fractions' || builtinIdFromHash(0) === null).toBe(true);
   });
 });

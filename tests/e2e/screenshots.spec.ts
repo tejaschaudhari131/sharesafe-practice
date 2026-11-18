@@ -49,10 +49,10 @@ for (const [label, viewport] of [['desktop', { width: 1280, height: 800 }], ['mo
 test('results, builder, Spanish, and scam (desktop)', async ({ page }) => {
   await page.goto('/');
   await startPre(page);
-  await doCheck(page, 'pre', 2);
+  await doCheck(page, 'pre', 0);
   await page.locator('button[data-go=begin-practice]').click();
   await page.locator('main button[data-go=post]').click();
-  await doCheck(page, 'post', 6);
+  await doCheck(page, 'post', 2);
   await shot(page, 'desktop-11-results-before-after');
 
   await page.goto('/');
@@ -68,8 +68,23 @@ test('results, builder, Spanish, and scam (desktop)', async ({ page }) => {
   await page.getByRole('button', { name: 'Español' }).click();
   await page.locator('input[name=pack][value=scam]').check();
   await startPre(page);
-  await doCheck(page, 'pre', 6, (await import('../../src/packs/scam')).pack.pre);
+  await doCheck(page, 'pre', 2, (await import('../../src/packs/scam')).pack.pre);
   await page.locator('button[data-go=begin-practice]').click();
   await expect(page.locator('.mail')).toBeVisible();
   await shot(page, 'desktop-14-scam-message');
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Teacher pack builder' }).first().click();
+  await expect(page.locator('#verify-h')).toHaveText('Teacher Verify', { timeout: 15_000 });
+  await shot(page, 'desktop-15-teacher-verify');
+
+  await page.goto('/');
+  await expect(page.locator('#storage-badge')).toBeVisible();
+  await shot(page, 'desktop-16-storage-badge');
+
+  await page.getByRole('button', { name: 'English' }).click();
+  await page.locator('input[name=pack][value=fractions]').check();
+  await startPre(page);
+  await expect(page.locator('h1')).toContainText(/pregunta 1|Prueba inicial|question 1/i);
+  await shot(page, 'desktop-17-spanish-fractions');
 });

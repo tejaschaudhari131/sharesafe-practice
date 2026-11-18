@@ -16,19 +16,34 @@ export type Answer =
   | { kind: 'frac'; value: Frac }
   | { kind: 'cmp'; value: '<' | '>' | '=' };
 
+export interface BiText { en: Text; es: Text }
+
 export interface Problem {
   id: string;
   skill: Skill;
   /** Parts of the question: strings and fractions, rendered in order. */
   parts: Array<string | FracSlot | { blank: true }>;
-  prompt: Text;
-  speech: string;
+  prompt: BiText;
+  speech: { en: string; es: string };
   answer: Answer;
-  hints: Text[];
-  steps: Text[];
+  hints: BiText[];
+  steps: BiText[];
   /** Optional visual model for hint 1: fraction bars to draw. */
   bars?: Frac[];
 }
+
+export function pickBi(t: BiText, lang: 'en' | 'es', plain: boolean): string {
+  const loc = lang === 'es' ? t.es : t.en;
+  return plain ? loc.plain : loc.std;
+}
+export function pickSpeech(p: Problem, lang: 'en' | 'es'): string {
+  return lang === 'es' ? p.speech.es : p.speech.en;
+}
+
+const Bi = (enStd: string, enPlain: string, esStd: string, esPlain: string): BiText => ({
+  en: { std: enStd, plain: enPlain },
+  es: { std: esStd, plain: esPlain },
+});
 
 export function gcd(a: number, b: number): number {
   a = Math.abs(a); b = Math.abs(b);
@@ -47,6 +62,7 @@ export const cmp = (a: Frac, b: Frac): '<' | '>' | '=' => {
 };
 export const fs = (f: Frac) => `${f.n}/${f.d}`;
 export const say = (f: Frac) => `${f.n} over ${f.d}`;
+const sayEs = (f: Frac) => `${f.n} sobre ${f.d}`;
 
 /** mulberry32: small deterministic PRNG. */
 export function rng(seed: number) {
@@ -83,43 +99,71 @@ function genEquiv(r: () => number): Omit<Problem, 'id' | 'skill'> {
   if (missingTop) {
     return {
       parts: [base, '=', { n: '?', d: big.d }],
-      prompt: { std: `Find the missing numerator so the fractions are equivalent`,
-                plain: `Fill in the top number so both fractions are the same amount` },
-      speech: `${say(base)} equals what over ${big.d}?`,
+      prompt: Bi(
+        `Find the missing numerator so the fractions are equivalent`,
+        `Fill in the top number so both fractions are the same amount`,
+        `Halla el numerador que falta para que las fracciones sean equivalentes`,
+        `Escribe el número de arriba para que las dos fracciones sean la misma cantidad`,
+      ),
+      speech: { en: `${say(base)} equals what over ${big.d}?`, es: `${sayEs(base)} es igual a qué sobre ${big.d}?` },
       answer: { kind: 'int', value: big.n },
       bars: [base, big],
       hints: [
-        { std: `Compare the denominators: ${base.d} became ${big.d}. What was ${base.d} multiplied by?`,
-          plain: `Look at the bottom numbers. ${base.d} turned into ${big.d}. What did we times ${base.d} by?` },
-        { std: `${base.d} × ${k} = ${big.d}, so the multiplier is ${k}.`, plain: `${base.d} times ${k} is ${big.d}. So we times by ${k}.` },
-        { std: `Multiply the numerator by the same number: ${base.n} × ${k} = ?`, plain: `Do the same thing to the top: ${base.n} times ${k}.` },
+        Bi(`Compare the denominators: ${base.d} became ${big.d}. What was ${base.d} multiplied by?`,
+          `Look at the bottom numbers. ${base.d} turned into ${big.d}. What did we times ${base.d} by?`,
+          `Compara los denominadores: ${base.d} pasó a ${big.d}. ¿Por cuánto se multiplicó ${base.d}?`,
+          `Mira los números de abajo. ${base.d} se convirtió en ${big.d}. ¿Por cuánto multiplicamos ${base.d}?`),
+        Bi(`${base.d} × ${k} = ${big.d}, so the multiplier is ${k}.`, `${base.d} times ${k} is ${big.d}. So we times by ${k}.`,
+          `${base.d} × ${k} = ${big.d}, así que el factor es ${k}.`, `${base.d} por ${k} es ${big.d}. Entonces multiplicamos por ${k}.`),
+        Bi(`Multiply the numerator by the same number: ${base.n} × ${k} = ?`, `Do the same thing to the top: ${base.n} times ${k}.`,
+          `Multiplica el numerador por el mismo número: ${base.n} × ${k} = ?`, `Haz lo mismo arriba: ${base.n} por ${k}.`),
       ],
       steps: [
-        { std: `Equivalent fractions: multiply numerator and denominator by the same nonzero number.`, plain: `To make the same amount, times the top and bottom by the same number.` },
-        { std: `${base.d} × ${k} = ${big.d}`, plain: `Bottom: ${base.d} × ${k} = ${big.d}` },
-        { std: `${base.n} × ${k} = ${big.n}`, plain: `Top: ${base.n} × ${k} = ${big.n}` },
-        { std: `So ${fs(base)} = ${fs(big)}.`, plain: `So ${fs(base)} is the same as ${fs(big)}.` },
+        Bi(`Equivalent fractions: multiply numerator and denominator by the same nonzero number.`,
+          `To make the same amount, times the top and bottom by the same number.`,
+          `Fracciones equivalentes: multiplica el numerador y el denominador por el mismo número distinto de cero.`,
+          `Para obtener la misma cantidad, multiplica arriba y abajo por el mismo número.`),
+        Bi(`${base.d} × ${k} = ${big.d}`, `Bottom: ${base.d} × ${k} = ${big.d}`,
+          `${base.d} × ${k} = ${big.d}`, `Abajo: ${base.d} × ${k} = ${big.d}`),
+        Bi(`${base.n} × ${k} = ${big.n}`, `Top: ${base.n} × ${k} = ${big.n}`,
+          `${base.n} × ${k} = ${big.n}`, `Arriba: ${base.n} × ${k} = ${big.n}`),
+        Bi(`So ${fs(base)} = ${fs(big)}.`, `So ${fs(base)} is the same as ${fs(big)}.`,
+          `Entonces ${fs(base)} = ${fs(big)}.`, `Entonces ${fs(base)} es lo mismo que ${fs(big)}.`),
       ],
     };
   }
   return {
     parts: [base, '=', { n: big.n, d: '?' }],
-    prompt: { std: `Find the missing denominator so the fractions are equivalent`,
-              plain: `Fill in the bottom number so both fractions are the same amount` },
-    speech: `${say(base)} equals ${big.n} over what?`,
+    prompt: Bi(
+      `Find the missing denominator so the fractions are equivalent`,
+      `Fill in the bottom number so both fractions are the same amount`,
+      `Halla el denominador que falta para que las fracciones sean equivalentes`,
+      `Escribe el número de abajo para que las dos fracciones sean la misma cantidad`,
+    ),
+    speech: { en: `${say(base)} equals ${big.n} over what?`, es: `${sayEs(base)} es igual a ${big.n} sobre qué?` },
     answer: { kind: 'int', value: big.d },
     bars: [base, big],
     hints: [
-      { std: `Compare the numerators: ${base.n} became ${big.n}. What was ${base.n} multiplied by?`,
-        plain: `Look at the top numbers. ${base.n} turned into ${big.n}. What did we times ${base.n} by?` },
-      { std: `${base.n} × ${k} = ${big.n}, so the multiplier is ${k}.`, plain: `${base.n} times ${k} is ${big.n}. So we times by ${k}.` },
-      { std: `Multiply the denominator by the same number: ${base.d} × ${k} = ?`, plain: `Do the same thing to the bottom: ${base.d} times ${k}.` },
+      Bi(`Compare the numerators: ${base.n} became ${big.n}. What was ${base.n} multiplied by?`,
+        `Look at the top numbers. ${base.n} turned into ${big.n}. What did we times ${base.n} by?`,
+        `Compara los numeradores: ${base.n} pasó a ${big.n}. ¿Por cuánto se multiplicó ${base.n}?`,
+        `Mira los números de arriba. ${base.n} se convirtió en ${big.n}. ¿Por cuánto multiplicamos ${base.n}?`),
+      Bi(`${base.n} × ${k} = ${big.n}, so the multiplier is ${k}.`, `${base.n} times ${k} is ${big.n}. So we times by ${k}.`,
+        `${base.n} × ${k} = ${big.n}, así que el factor es ${k}.`, `${base.n} por ${k} es ${big.n}. Entonces multiplicamos por ${k}.`),
+      Bi(`Multiply the denominator by the same number: ${base.d} × ${k} = ?`, `Do the same thing to the bottom: ${base.d} times ${k}.`,
+        `Multiplica el denominador por el mismo número: ${base.d} × ${k} = ?`, `Haz lo mismo abajo: ${base.d} por ${k}.`),
     ],
     steps: [
-      { std: `Equivalent fractions: multiply numerator and denominator by the same nonzero number.`, plain: `To make the same amount, times the top and bottom by the same number.` },
-      { std: `${base.n} × ${k} = ${big.n}`, plain: `Top: ${base.n} × ${k} = ${big.n}` },
-      { std: `${base.d} × ${k} = ${big.d}`, plain: `Bottom: ${base.d} × ${k} = ${big.d}` },
-      { std: `So ${fs(base)} = ${fs(big)}.`, plain: `So ${fs(base)} is the same as ${fs(big)}.` },
+      Bi(`Equivalent fractions: multiply numerator and denominator by the same nonzero number.`,
+        `To make the same amount, times the top and bottom by the same number.`,
+        `Fracciones equivalentes: multiplica el numerador y el denominador por el mismo número distinto de cero.`,
+        `Para obtener la misma cantidad, multiplica arriba y abajo por el mismo número.`),
+      Bi(`${base.n} × ${k} = ${big.n}`, `Top: ${base.n} × ${k} = ${big.n}`,
+        `${base.n} × ${k} = ${big.n}`, `Arriba: ${base.n} × ${k} = ${big.n}`),
+      Bi(`${base.d} × ${k} = ${big.d}`, `Bottom: ${base.d} × ${k} = ${big.d}`,
+        `${base.d} × ${k} = ${big.d}`, `Abajo: ${base.d} × ${k} = ${big.d}`),
+      Bi(`So ${fs(base)} = ${fs(big)}.`, `So ${fs(base)} is the same as ${fs(big)}.`,
+        `Entonces ${fs(base)} = ${fs(big)}.`, `Entonces ${fs(base)} es lo mismo que ${fs(big)}.`),
     ],
   };
 }
@@ -140,31 +184,50 @@ function genAddSub(r: () => number): Omit<Problem, 'id' | 'skill'> {
   const ans = simplify(raw);
   const op = add ? '+' : '−';
   const word = add ? 'plus' : 'minus';
+  const wordEs = add ? 'más' : 'menos';
   const opWord = add ? 'Add' : 'Subtract';
+  const opWordEs = add ? 'Suma' : 'Resta';
   const simpler = ans.d !== raw.d;
+  const g = raw.d / ans.d;
   return {
     parts: [a, op, b, '=', { blank: true }],
-    prompt: { std: `${opWord}. Write the answer as a fraction (simplest form preferred)`,
-              plain: `${add ? 'Add' : 'Take away'}. Type the top number and the bottom number of your answer.` },
-    speech: `${say(a)} ${word} ${say(b)}`,
+    prompt: Bi(
+      `${opWord}. Write the answer as a fraction (simplest form preferred)`,
+      `${add ? 'Add' : 'Take away'}. Type the top number and the bottom number of your answer.`,
+      `${opWordEs}. Escribe la respuesta como fracción (se prefiere la forma simplificada)`,
+      `${add ? 'Suma' : 'Resta'}. Escribe el número de arriba y el de abajo de tu respuesta.`,
+    ),
+    speech: { en: `${say(a)} ${word} ${say(b)}`, es: `${sayEs(a)} ${wordEs} ${sayEs(b)}` },
     answer: { kind: 'frac', value: ans },
     bars: [a, b],
     hints: [
-      { std: `The denominators (${a.d} and ${b.d}) are different. Find a common denominator: the least common multiple of ${a.d} and ${b.d}.`,
-        plain: `The bottom numbers (${a.d} and ${b.d}) are not the same. Find the smallest number both ${a.d} and ${b.d} go into.` },
-      { std: `The LCD is ${L}. Rewrite: ${fs(a)} = ${fs(A)} and ${fs(b)} = ${fs(B)}.`,
-        plain: `Use ${L} as the bottom. ${fs(a)} becomes ${fs(A)}. ${fs(b)} becomes ${fs(B)}.` },
-      { std: `Now ${add ? 'add' : 'subtract'} the numerators and keep the denominator: ${A.n} ${op} ${B.n} = ${raw.n}, over ${L}.`,
-        plain: `Now ${add ? 'add' : 'take away'} only the top numbers: ${A.n} ${op} ${B.n}. Keep ${L} on the bottom.` },
+      Bi(`The denominators (${a.d} and ${b.d}) are different. Find a common denominator: the least common multiple of ${a.d} and ${b.d}.`,
+        `The bottom numbers (${a.d} and ${b.d}) are not the same. Find the smallest number both ${a.d} and ${b.d} go into.`,
+        `Los denominadores (${a.d} y ${b.d}) son diferentes. Halla un denominador común: el mínimo común múltiplo de ${a.d} y ${b.d}.`,
+        `Los números de abajo (${a.d} y ${b.d}) no son iguales. Halla el número más pequeño en el que caben ${a.d} y ${b.d}.`),
+      Bi(`The LCD is ${L}. Rewrite: ${fs(a)} = ${fs(A)} and ${fs(b)} = ${fs(B)}.`,
+        `Use ${L} as the bottom. ${fs(a)} becomes ${fs(A)}. ${fs(b)} becomes ${fs(B)}.`,
+        `El mínimo común denominador es ${L}. Reescribe: ${fs(a)} = ${fs(A)} y ${fs(b)} = ${fs(B)}.`,
+        `Usa ${L} abajo. ${fs(a)} se convierte en ${fs(A)}. ${fs(b)} se convierte en ${fs(B)}.`),
+      Bi(`Now ${add ? 'add' : 'subtract'} the numerators and keep the denominator: ${A.n} ${op} ${B.n} = ${raw.n}, over ${L}.`,
+        `Now ${add ? 'add' : 'take away'} only the top numbers: ${A.n} ${op} ${B.n}. Keep ${L} on the bottom.`,
+        `Ahora ${add ? 'suma' : 'resta'} los numeradores y conserva el denominador: ${A.n} ${op} ${B.n} = ${raw.n}, sobre ${L}.`,
+        `Ahora ${add ? 'suma' : 'resta'} solo los números de arriba: ${A.n} ${op} ${B.n}. Deja ${L} abajo.`),
     ],
     steps: [
-      { std: `LCD of ${a.d} and ${b.d} is ${L}.`, plain: `The shared bottom number is ${L}.` },
-      { std: `${fs(a)} = ${a.n}×${ka} / ${a.d}×${ka} = ${fs(A)}`, plain: `${fs(a)}: times top and bottom by ${ka} → ${fs(A)}` },
-      { std: `${fs(b)} = ${b.n}×${kb} / ${b.d}×${kb} = ${fs(B)}`, plain: `${fs(b)}: times top and bottom by ${kb} → ${fs(B)}` },
-      { std: `${fs(A)} ${op} ${fs(B)} = ${fs(raw)}`, plain: `${A.n} ${op} ${B.n} = ${raw.n}, so ${fs(raw)}` },
+      Bi(`LCD of ${a.d} and ${b.d} is ${L}.`, `The shared bottom number is ${L}.`,
+        `El mínimo común denominador de ${a.d} y ${b.d} es ${L}.`, `El número de abajo compartido es ${L}.`),
+      Bi(`${fs(a)} = ${a.n}×${ka} / ${a.d}×${ka} = ${fs(A)}`, `${fs(a)}: times top and bottom by ${ka} → ${fs(A)}`,
+        `${fs(a)} = ${a.n}×${ka} / ${a.d}×${ka} = ${fs(A)}`, `${fs(a)}: multiplica arriba y abajo por ${ka} → ${fs(A)}`),
+      Bi(`${fs(b)} = ${b.n}×${kb} / ${b.d}×${kb} = ${fs(B)}`, `${fs(b)}: times top and bottom by ${kb} → ${fs(B)}`,
+        `${fs(b)} = ${b.n}×${kb} / ${b.d}×${kb} = ${fs(B)}`, `${fs(b)}: multiplica arriba y abajo por ${kb} → ${fs(B)}`),
+      Bi(`${fs(A)} ${op} ${fs(B)} = ${fs(raw)}`, `${A.n} ${op} ${B.n} = ${raw.n}, so ${fs(raw)}`,
+        `${fs(A)} ${op} ${fs(B)} = ${fs(raw)}`, `${A.n} ${op} ${B.n} = ${raw.n}, entonces ${fs(raw)}`),
       simpler
-        ? { std: `Simplify by dividing by ${raw.d / ans.d}: ${fs(raw)} = ${fs(ans)}.`, plain: `Make it simpler: divide top and bottom by ${raw.d / ans.d} → ${fs(ans)}.` }
-        : { std: `${fs(ans)} is already in simplest form.`, plain: `${fs(ans)} can't be made simpler.` },
+        ? Bi(`Simplify by dividing by ${g}: ${fs(raw)} = ${fs(ans)}.`, `Make it simpler: divide top and bottom by ${g} → ${fs(ans)}.`,
+            `Simplifica al dividir entre ${g}: ${fs(raw)} = ${fs(ans)}.`, `Hazlo más simple: divide arriba y abajo entre ${g} → ${fs(ans)}.`)
+        : Bi(`${fs(ans)} is already in simplest form.`, `${fs(ans)} can't be made simpler.`,
+            `${fs(ans)} ya está en su forma simplificada.`, `${fs(ans)} no se puede simplificar más.`),
     ],
   };
 }
@@ -183,24 +246,41 @@ function genCompare(r: () => number): Omit<Problem, 'id' | 'skill'> {
   const L = lcm(a.d, b.d);
   const A = { n: a.n * (L / a.d), d: L }, B = { n: b.n * (L / b.d), d: L };
   const relWord = { '<': 'is less than', '>': 'is greater than', '=': 'is equal to' }[rel];
+  const relWordEs = { '<': 'es menor que', '>': 'es mayor que', '=': 'es igual a' }[rel];
   return {
     parts: [a, { blank: true }, b],
-    prompt: { std: `Compare the fractions. Choose <, >, or =`,
-              plain: `Which is bigger? Pick less than, greater than, or equal` },
-    speech: `Compare ${say(a)} and ${say(b)}`,
+    prompt: Bi(
+      `Compare the fractions. Choose <, >, or =`,
+      `Which is bigger? Pick less than, greater than, or equal`,
+      `Compara las fracciones. Elige <, > o =`,
+      `¿Cuál es mayor? Elige menor que, mayor que o igual`,
+    ),
+    speech: { en: `Compare ${say(a)} and ${say(b)}`, es: `Compara ${sayEs(a)} y ${sayEs(b)}` },
     answer: { kind: 'cmp', value: rel },
     bars: [a, b],
     hints: [
-      { std: `It's hard to compare different denominators. Rewrite both with a common denominator.`,
-        plain: `The bottom numbers are different, so make them the same first.` },
-      { std: `Use ${L}: ${fs(a)} = ${fs(A)} and ${fs(b)} = ${fs(B)}.`, plain: `With ${L} on the bottom: ${fs(a)} is ${fs(A)}, and ${fs(b)} is ${fs(B)}.` },
-      { std: `Now compare the numerators ${A.n} and ${B.n}.`, plain: `Now just look at the top numbers: ${A.n} and ${B.n}. Which is bigger?` },
+      Bi(`It's hard to compare different denominators. Rewrite both with a common denominator.`,
+        `The bottom numbers are different, so make them the same first.`,
+        `Es difícil comparar denominadores distintos. Reescribe ambas fracciones con un denominador común.`,
+        `Los números de abajo son diferentes, así que primero hazlos iguales.`),
+      Bi(`Use ${L}: ${fs(a)} = ${fs(A)} and ${fs(b)} = ${fs(B)}.`,
+        `With ${L} on the bottom: ${fs(a)} is ${fs(A)}, and ${fs(b)} is ${fs(B)}.`,
+        `Usa ${L}: ${fs(a)} = ${fs(A)} y ${fs(b)} = ${fs(B)}.`,
+        `Con ${L} abajo: ${fs(a)} es ${fs(A)}, y ${fs(b)} es ${fs(B)}.`),
+      Bi(`Now compare the numerators ${A.n} and ${B.n}.`,
+        `Now just look at the top numbers: ${A.n} and ${B.n}. Which is bigger?`,
+        `Ahora compara los numeradores ${A.n} y ${B.n}.`,
+        `Ahora mira solo los números de arriba: ${A.n} y ${B.n}. ¿Cuál es mayor?`),
     ],
     steps: [
-      { std: `Common denominator: ${L}.`, plain: `Same bottom number: ${L}.` },
-      { std: `${fs(a)} = ${fs(A)}, ${fs(b)} = ${fs(B)}.`, plain: `${fs(a)} → ${fs(A)}; ${fs(b)} → ${fs(B)}.` },
-      { std: `${A.n} ${rel} ${B.n}, so ${fs(a)} ${rel} ${fs(b)} (${fs(a)} ${relWord} ${fs(b)}).`,
-        plain: `${A.n} ${rel} ${B.n}, so ${fs(a)} ${relWord} ${fs(b)}.` },
+      Bi(`Common denominator: ${L}.`, `Same bottom number: ${L}.`,
+        `Denominador común: ${L}.`, `El mismo número de abajo: ${L}.`),
+      Bi(`${fs(a)} = ${fs(A)}, ${fs(b)} = ${fs(B)}.`, `${fs(a)} → ${fs(A)}; ${fs(b)} → ${fs(B)}.`,
+        `${fs(a)} = ${fs(A)}, ${fs(b)} = ${fs(B)}.`, `${fs(a)} → ${fs(A)}; ${fs(b)} → ${fs(B)}.`),
+      Bi(`${A.n} ${rel} ${B.n}, so ${fs(a)} ${rel} ${fs(b)} (${fs(a)} ${relWord} ${fs(b)}).`,
+        `${A.n} ${rel} ${B.n}, so ${fs(a)} ${relWord} ${fs(b)}.`,
+        `${A.n} ${rel} ${B.n}, entonces ${fs(a)} ${rel} ${fs(b)} (${fs(a)} ${relWordEs} ${fs(b)}).`,
+        `${A.n} ${rel} ${B.n}, entonces ${fs(a)} ${relWordEs} ${fs(b)}.`),
     ],
   };
 }
@@ -214,10 +294,12 @@ export function generate(skill: Skill, seed: number, index: number, purpose: Pur
   return { id: `${purpose}-${skill}-${seed}-${index}`, skill, ...body };
 }
 
-/** The 6-question pre/post check: 2 of each skill, interleaved. */
-export const CHECK_LEN = 6;
+/** The 2-question pre/post check: equivalent fractions, then add/subtract. Post uses the same skills with new numbers. */
+export const CHECK_LEN = 2;
+export const CHECK_SKILLS: Skill[] = ['equiv', 'addsub'];
 export function checkProblem(seed: number, i: number, purpose: 'pre' | 'post'): Problem {
-  return generate(SKILLS[i % 3], seed, Math.floor(i / 3), purpose);
+  const k = Math.max(0, Math.min(CHECK_SKILLS.length - 1, i));
+  return generate(CHECK_SKILLS[k], seed, 0, purpose);
 }
 
 export type Grade = { correct: boolean; simplestNote?: Frac; invalid?: string };

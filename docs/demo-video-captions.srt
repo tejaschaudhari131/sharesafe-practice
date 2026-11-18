@@ -1,151 +1,133 @@
 1
-00:00:00,000 --> 00:00:05,728
+00:00:00,000 --> 00:00:05,150
 Seventeen percent of U.S. teens say they
 often or sometimes can't finish homework
 
 2
-00:00:05,778 --> 00:00:09,283
+00:00:05,200 --> 00:00:08,350
 because they lack reliable computer or
 internet access.
 
 3
-00:00:09,333 --> 00:00:11,950
-That's from Pew Research Center, 2018.
+00:00:08,400 --> 00:00:10,350
+That's Pew Research Center, 2018.
 
 4
-00:00:12,000 --> 00:00:16,582
-ShareSafe Practice is digital-safety
-lessons for students like Maya, a seventh
+00:00:10,400 --> 00:00:15,550
+Many of those students work on shared
+library computers, public Wi-Fi, or
+throttled
 
 5
-00:00:16,632 --> 00:00:21,213
-grader on a library computer with an old
-phone at home.
+00:00:15,600 --> 00:00:21,550
+phones, where creating an account is a
+privacy risk and a dropped signal wipes
+the
 
 6
-00:00:21,263 --> 00:00:27,529
-No account, no name, and nothing saved
-after she closes the tab, unless she
-chooses
+00:00:21,600 --> 00:00:21,950
+work.
 
 7
-00:00:27,579 --> 00:00:27,950
-to.
+00:00:22,000 --> 00:00:26,916
+Maya starts Permission to Learn with no
+login.
 
 8
-00:00:28,000 --> 00:00:30,867
-Everything works from the keyboard.
+00:00:26,966 --> 00:00:32,502
+She misses a two-question pre-check about
+a 403 error.
 
 9
-00:00:30,917 --> 00:00:36,700
-She picks Permission to Learn and starts a
-six-question pre-check.
+00:00:32,552 --> 00:00:41,191
+The lesson explains the 403, then she
+practises least privilege on a class
+roster.
 
 10
-00:00:36,750 --> 00:00:41,950
-No hints here, it just shows where she
-begins.
+00:00:41,241 --> 00:00:48,019
+A new two-question post-check asks the
+same ideas with different details.
 
 11
-00:00:42,000 --> 00:00:52,266
-The lesson opens on a confusing 403
-Forbidden screen, then explains it in
-plain
+00:00:48,069 --> 00:00:56,088
+The Before/After Mastery card shows her
+growth, and says this is immediate
+transfer,
 
 12
-00:00:52,316 --> 00:00:53,003
-language.
+00:00:56,138 --> 00:00:57,950
+not long-term retention.
 
 13
-00:00:53,053 --> 00:01:02,582
-Then she practises least privilege: who
-can view or edit a class roster.
+00:00:58,000 --> 00:01:02,415
+She copies an 18-character completion
+code.
 
 14
-00:01:02,632 --> 00:01:09,950
-If she grants too much access, the
-feedback says so.
+00:01:02,465 --> 00:01:09,857
+Leave-no-trace mode stores zero bytes of
+progress on the device.
 
 15
-00:01:10,000 --> 00:01:17,362
-Students can make the text bigger, switch
-to high contrast, or turn on plain
+00:01:09,907 --> 00:01:17,299
+Wipe session, or Escape twice, clears the
+tab and confirms.
 
 16
-00:01:17,412 --> 00:01:17,891
-language.
+00:01:17,349 --> 00:01:29,206
+On her phone, in airplane mode, she enters
+the code and the same pack comes back
 
 17
-00:01:17,941 --> 00:01:24,244
-A language switcher sets Spanish,
-including the lesson, and updates the page
+00:01:29,256 --> 00:01:29,950
+offline.
 
 18
-00:01:24,294 --> 00:01:27,950
-language so a screen reader switches too.
+00:01:30,000 --> 00:01:37,764
+A language switcher sets Spanish,
+including Everyday Fractions, and updates
+the page
 
 19
-00:01:28,000 --> 00:01:34,472
-Before leaving the library, Maya gets her
-resume code, or scans the QR with her
+00:01:37,814 --> 00:01:42,973
+language so a screen reader can switch
+voices.
 
 20
-00:01:34,522 --> 00:01:34,907
-phone.
+00:01:43,023 --> 00:01:50,787
+Our honest testing matrix lists automated
+scores, emulated keyboard and zoom checks,
 
 21
-00:01:34,957 --> 00:01:41,863
-It carries her progress and which pack she
-was in, with no account and no server.
+00:01:50,837 --> 00:01:57,950
+and the manual tests still to do,
+including real screen readers.
 
 22
-00:01:41,913 --> 00:01:47,950
-The last two characters catch typos, not
-forgery, and the app says so honestly.
+00:01:58,000 --> 00:02:06,050
+A teacher writes a short question, watches
+the byte count, and prints a QR handout.
 
 23
-00:01:48,000 --> 00:01:55,863
-The first load is about twenty-eight
-kilobytes, and packs are cached after one
+00:02:06,100 --> 00:02:10,910
+Scanning the code loads the pack with no
+backend.
 
 24
-00:01:55,913 --> 00:01:56,472
-visit.
+00:02:10,960 --> 00:02:19,010
+Pasting the student code into Teacher
+Verify shows the pack and the pre and post
 
 25
-00:01:56,522 --> 00:02:01,950
-So at home, with no internet, it still
-works.
+00:02:19,060 --> 00:02:19,550
+scores.
 
 26
-00:02:02,000 --> 00:02:09,298
-On the shared computer, End session wipes
-everything the app stored, including the
+00:02:19,600 --> 00:02:23,870
+The checksum catches typos; it is not
+forgery-proof.
 
 27
-00:02:09,348 --> 00:02:14,950
-offline copy if she wants, and confirms
-what it removed.
-
-28
-00:02:15,000 --> 00:02:17,200
-Then the post-check shows her growth.
-
-29
-00:02:17,250 --> 00:02:22,450
-Teachers can build a pack, watch the byte
-count, and print a QR handout.
-
-30
-00:02:22,500 --> 00:02:27,325
-Lighthouse scores a hundred in every
-category, axe finds no violations, and
-real
-
-31
-00:02:27,375 --> 00:02:29,200
-screen reader testing is next.
-
-32
-00:02:29,250 --> 00:02:29,950
+00:02:23,920 --> 00:02:24,950
 ShareSafe Practice.

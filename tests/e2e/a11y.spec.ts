@@ -27,7 +27,7 @@ for (const mode of ['default', 'high-contrast+large+plain']) {
     all.push(...await scan(page, `${mode}: home`));
     await startPre(page);
     all.push(...await scan(page, `${mode}: pre-check`));
-    await doCheck(page, 'pre', 3);
+    await doCheck(page, 'pre', 2);
     all.push(...await scan(page, `${mode}: 403 intro`));
     await page.locator('button[data-go=begin-practice]').click();
     await page.locator('#hint-btn').click();
@@ -58,6 +58,55 @@ test('axe: builder and Spanish home', async ({ page }) => {
   await expect(page.locator('h1')).toHaveText('Teacher pack builder', { timeout: 15_000 });
   const v2 = await scan(page, 'default: builder');
   expect([...v1, ...v2], JSON.stringify(results, null, 2)).toEqual([]);
+});
+
+test('axe: mastery card, teacher verify, and Spanish fractions', async ({ page }) => {
+  await page.goto('/');
+  await startPre(page);
+  await doCheck(page, 'pre', 0);
+  await page.locator('button[data-go=begin-practice]').click();
+  await page.locator('main button[data-go=post]').click();
+  await doCheck(page, 'post', 2);
+  await expect(page.locator('.mastery')).toBeVisible();
+  const v1 = await scan(page, 'default: mastery');
+  await page.getByRole('button', { name: 'Teacher pack builder' }).first().click();
+  await expect(page.locator('#verify-h')).toHaveText('Teacher Verify', { timeout: 15_000 });
+  const v2 = await scan(page, 'default: teacher-verify');
+  await page.goto('/');
+  await page.getByRole('button', { name: 'English' }).click();
+  await page.locator('input[name=pack][value=fractions]').check();
+  await startPre(page);
+  await expect(page.locator('h1')).toContainText(/pregunta 1|question 1/i);
+  const v3 = await scan(page, 'spanish: fractions-pre');
+  expect([...v1, ...v2, ...v3], JSON.stringify(results, null, 2)).toEqual([]);
+});
+
+test('emulated 320px reflow, reduced motion, and forced colors', async ({ browser }) => {
+  const ctx = await browser.newContext({
+    viewport: { width: 320, height: 640 },
+    reducedMotion: 'reduce',
+    forcedColors: 'active',
+  });
+  const page = await ctx.newPage();
+  await page.goto('/');
+  await expect(page.locator('h1')).toBeVisible();
+  const homeOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 2);
+  expect(homeOverflow, 'home should reflow at 320px without horizontal scroll').toBe(false);
+  const vHome = await scan(page, 'emulated-320-forced-colors: home');
+  await startPre(page);
+  await doCheck(page, 'pre', 2);
+  await page.locator('button[data-go=begin-practice]').click();
+  await page.locator('main button[data-go=code]').click();
+  await expect(page.locator('#the-code')).toBeVisible();
+  const codeOverflow = await page.evaluate(() => {
+    const el = document.getElementById('the-code');
+    if (!el) return true;
+    return el.scrollWidth > el.clientWidth + 2 || document.documentElement.scrollWidth > document.documentElement.clientWidth + 2;
+  });
+  expect(codeOverflow, 'resume code should wrap at 320px').toBe(false);
+  const vCode = await scan(page, 'emulated-320-forced-colors: resume-code');
+  await ctx.close();
+  expect([...vHome, ...vCode], JSON.stringify(results, null, 2)).toEqual([]);
 });
 
 test.afterAll(() => {

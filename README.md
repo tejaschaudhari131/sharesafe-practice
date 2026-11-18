@@ -1,6 +1,6 @@
 # ShareSafe Practice
 
-> Digital-safety lessons for students who share devices or have unreliable internet: no account, works offline, accessible, private by default, and a resume code carries progress anywhere.
+> Digital-safety lessons for students on shared library PCs and old phones: no account, works offline, accessible, private by default, in English and Spanish, and teachers can load any pack.
 
 **AccessED Hacks entry** · Solo entrant: Tejas Chaudhari · Build window **Oct 17 – Nov 20, 2026** · Pre-existing work: **none** (everything in this repo was created during the build window).
 
@@ -8,13 +8,66 @@ Demo: [DEMO_URL] · Video: [VIDEO_URL] · Repo: [REPO_URL]
 
 ---
 
-## Contents
-1. [Problem](#problem)
-2. [Intended users](#intended-users)
-3. [Solution](#solution)
-4. [Judging criteria map](#judging-criteria-map)
-5. [Tools](#tools) · [Setup](#setup) · [Challenges](#challenges) · [What I learned](#what-i-learned) · [Limitations](#limitations)
-6. [Deploying](#deploying-not-done-yet) · [Credits, AI disclosure, pre-existing work](#credits-ai-disclosure-and-pre-existing-work)
+## 60-second judge tour
+
+Open [DEMO_URL] (or `npm run build && npm run preview`, then http://localhost:4173). No account is needed.
+
+1. **Home (10s).** The page is titled Digital Survival Curriculum. Permission to Learn and Spot the Scam are the core lessons. Everyday Fractions is labeled as a bilingual teacher-pack demo. The footer storage badge should say **0 bytes** of progress on the device.
+2. **Pre-check (10s).** Start Permission to Learn. Miss both 2-item baseline questions (or get them right — either is fine).
+3. **Lesson + transfer (20s).** Read the mock 403, continue, set access on the class roster (hints are available), then take the **isomorphic** 2-item post-check (same ideas, new details). The **Before/After Mastery** card shows the delta and a completion code. The card itself says this is immediate transfer, not long-term retention.
+4. **Leave no trace (10s).** Note the storage badge: 0 persistent bytes; the tab may hold a few hundred bytes until it closes; the offline app-shell cache stores no progress. Press **Wipe session**, or **Escape twice**, and confirm. Persistent storage stays at 0.
+5. **Teacher loop (10s).** Open **Teacher pack builder**. Paste the completion code into **Teacher Verify** — you should see the pack name and pre/post scores, plus an honest note that the checksum catches typos but is not forgery-proof. Optionally toggle Spanish, or print a QR handout for a tiny custom pack.
+
+---
+
+## Honest Testing Matrix
+
+Recorded **Nov 18, 2026**, America/New_York, against the production build in headless Google Chrome unless noted. Automated tools cannot certify WCAG conformance, and **no conformance claim is made**.
+
+### Verified Automated
+
+| Check | Tool / version | Result |
+|---|---|---|
+| Unit tests | Vitest 5.1.0 | **32 / 32** pass |
+| End-to-end tests | Playwright 1.65.0 | **17 / 17** pass (plus 3 screenshot-regen tests) |
+| axe-core | axe-core 4.14.0 via @axe-core/playwright 4.14.0, tags WCAG 2.0/2.1/2.2 A & AA + best-practice | **0 violations in 25 scans** (9 views × default and high-contrast + extra-large + plain language, plus Spanish home, builder, mastery card, Teacher Verify, Spanish fractions pre-check, and emulated 320px + forced-colors home and resume-code views). `docs/reports/axe-results.json` |
+| Lighthouse | 13.6.0, mobile and desktop | Performance **100**, Accessibility **100**, Best Practices **100**, SEO **100**. Mobile FCP 1.1 s, LCP 1.4 s, TBT 0 ms, CLS 0. Desktop FCP 0.3 s. Transfer size **33 KiB**. `docs/reports/lighthouse-*.report.html` |
+| First load (gzip) | Vite 6.4.6 production build | `index.html` 1.05 KB + `style.css` 2.83 KB + `index.js` 27.22 KB ≈ **31.1 KB**. No UI frameworks, web fonts, analytics, or LLM calls. Packs, builder, fractions and QR are lazy chunks. |
+| Throttled load | Playwright, emulated 2G / Slow 3G | Usable in **2.2 s** on Regular 2G (250 kbps, 300 ms RTT) and **1.75 s** on Slow 3G (400 kbps, 400 ms RTT). `docs/reports/throttle-results.json` |
+
+### Verified Manual
+
+These rows were run in **emulated** automation only, except where marked TODO. They are **not** a substitute for real assistive-technology or device testing.
+
+| Check | How it was run | Result |
+|---|---|---|
+| Keyboard-only journey | Playwright keyboard events (Tab, arrows, Enter, Escape) | Pass. Skip link is the first Tab stop; pre-check, 403 intro, access grid, resume code, typo rejection, restore, and double-Escape wipe confirmation all work. |
+| 320 px reflow | Playwright viewport **320×640** (emulated) | Pass after a fix: the native file-input widget overflowed by ~25 px; it is now visually hidden and activated from its label. Resume codes wrap. |
+| Forced colors | Playwright `forcedColors: 'active'` (emulated) | Pass. axe 0 on home and resume-code; focus rings and borders use system Highlight / ButtonText. |
+| Prefers-reduced-motion | Playwright `reducedMotion: 'reduce'` (emulated) | Pass. Animations and transitions are disabled in CSS. |
+| 200% zoom / 320 px | Emulated as a 320 CSS-pixel viewport (the WCAG 1.4.10 reflow target). A separate desktop-browser 200% zoom pass was **not** run by hand. | Emulated pass only. |
+| VoiceOver (macOS / iOS) | — | **TODO — not run** |
+| NVDA (Windows) | — | **TODO — not run** |
+| Safari desktop | — | **TODO — not run** |
+| Safari / iOS | — | **TODO — not run** |
+| Physical phone, airplane mode, offline resume | — | **TODO — not run** (wait until after a deploy; localhost QR codes are not scannable from a phone) |
+| Printed QR handout, native camera scan | — | **TODO — not run** (same reason) |
+| Native-speaker review of the Spanish | — | **TODO — not run**. Neutral school Spanish is in the app; it has not been reviewed by a fluent speaker. |
+
+The step-by-step list for the remaining manual work is in [`docs/tejas-manual-test-checklist.md`](docs/tejas-manual-test-checklist.md).
+
+### Explicitly Untested
+
+- **No K-12 students were tested.** There is no student data in the app or in this repo.
+- Pre/post scores measure **immediate scenario transfer** (same concept, new surface details in the same session). They are not a validated assessment and do not show longitudinal classroom retention. The mastery card says this in the UI.
+- **JAWS** and **refreshable braille displays** were not evaluated.
+- Real low-end hardware, TalkBack, and Safari/iOS were not evaluated (see TODO rows above).
+
+---
+
+## AI Attribution
+
+Most of the code, tests, lesson text, Spanish translation and documentation were drafted by an AI assistant (Grok Bot) at Tejas Chaudhari's direction. Tejas chose the problem, users, direction and constraints, and reviews the work. Commits by the assistant are authored as "Grok Bot (AI assistant for Tejas Chaudhari)". This disclosure also appears in the Devpost write-up.
 
 ---
 
@@ -22,142 +75,56 @@ Demo: [DEMO_URL] · Video: [VIDEO_URL] · Repo: [REPO_URL]
 
 In Pew Research Center's 2018 survey of U.S. teens ages 13–17, **17% said they are often or sometimes unable to complete homework because they lack reliable access to a computer or internet connection**. 12% said they at least sometimes use public Wi-Fi for schoolwork because they have no home internet, and 35% said they often or sometimes do homework on a cellphone, rising to 45% among teens in households earning under $30,000 a year. ([Pew Research Center, Anderson & Perrin, Oct 26, 2018](https://www.pewresearch.org/short-reads/2018/10/26/nearly-one-in-five-teens-cant-always-finish-their-homework-because-of-the-digital-divide/))
 
-Those students work on library PCs, school laptops, shared family phones and public Wi-Fi. That creates two barriers at once:
-
-1. **Access barrier.** Most learning tools assume an account, a personal device and a steady connection.
-2. **Safety barrier.** Shared devices and public networks are exactly where students meet confusing errors ("403 Forbidden"), over-shared files, and scam messages — yet digital-safety lessons usually live behind the same account-and-bandwidth wall.
+Those students work on shared library PCs, public Wi-Fi and low-end phones — the same places where login friction is high and digital-safety risks are highest.
 
 ## Intended users
 
-- **Primary:** middle-school and early high-school students who mostly use shared/public computers or low-end phones with limited data.
+- **Primary:** middle-school and early high-school students who mostly use shared or public computers or low-end phones with limited data.
 - **Also:** students who use a keyboard only, a screen reader, larger text or high contrast, plain language, read-aloud, or Spanish.
 - **Secondary:** teachers, librarians and after-school staff who want to hand out a lesson with a printed QR code and no logins to manage.
 
 ## Solution
 
-ShareSafe Practice is a tiny offline-first web app (PWA) that plays **content packs**. Packs are data files; the same player handles every pack.
+ShareSafe Practice is a tiny offline-first PWA that plays **content packs**.
 
-- **Permission to Learn (default pack, English + Spanish).** A student hits a confusing "403 Forbidden" screen, gets a plain-language explanation, then sets *no access / view / edit* for three fictional files — a class roster, a shared group project, and personal notes — with feedback on least privilege ("That's more access than this file needs").
-- **Spot the Scam.** Three fictional student-facing messages — a fake scholarship, a look-alike login, and a legitimate school notice — each with red/green flags explained. All domains use the reserved `.example` TLD.
-- **Fractions.** The original generated fractions practice, kept as a third pack to show any subject can be loaded.
-- **Every pack:** a short **pre-check → lesson → post-check** with before/after results.
-- **Teacher pack builder** (lazy-loaded, no backend): a form to write questions, a **live byte counter**, **export/import JSON**, and a **printable QR handout** that puts the whole pack in the URL hash, with a size warning when it won't fit.
-- **No account, no personal data. Works offline after one load. Leave-no-trace by default** (session storage only; *End session* wipes storage, IndexedDB, and optionally the offline copy).
-- **Resume code + QR.** An 18-character code (with a 2-character checksum) restores progress **and the pack** on any device.
-- **Accessible:** keyboard-only, screen-reader friendly, text size, high contrast, plain language, read-aloud, and an English/Spanish switcher that sets `<html lang>` correctly.
-
----
-
-## Judging criteria map
-
-The four criteria are equally weighted; each section below maps to one.
-
-### 1. Barrier Removed
-
-**Barriers addressed:** needing an account, a personal device, or a reliable connection; privacy risk on shared machines; and safety lessons that are themselves locked behind those requirements.
-
-*Scenario (illustrative):* Maya, a 7th grader with no home internet, has 30 minutes on a library PC and an old phone with almost no data.
-
-| | **Before** (typical account-based lesson site) | **After** (ShareSafe Practice) |
-|---|---|---|
-| Getting started | Make an account with an email before the first question. | Open the page, pick *Permission to Learn*, press **Start the pre-check**. No sign-up, no name. |
-| On the library PC | Login and progress sit on a shared machine. | Progress lives only in that tab. **End session** wipes it (tested to 0 items left). |
-| Taking it home | Needs internet to load and sync. | Scan the resume-code QR on library Wi-Fi; the phone caches the app and restores the same pack. |
-| At home, offline | Can't load. | Works offline, including lazily loaded packs. |
-| Data cost | Heavy pages. | ~31 KiB transferred on first load (Lighthouse); usable in ~1.7 s on emulated 2G. |
-| Result | Depends on account, device and connection. | Pre-check 2/6 → post-check 5/6, shown as **"Before 2/6 → After 5/6 (+3)"**. *These numbers are illustrative*; the same flow is reproduced by the e2e test "full journey reaches before/after results". |
-
-### 2. Learning Value
-
-- **A concrete, confusing moment as the hook.** Permission to Learn starts from a realistic 403 screen and explains what it means: you reached the server, and it is not allowed to show you this file.
-- **Practice that transfers.** Students set permissions per person for three different files. Feedback says whether the choice is *too open* or *too tight*, then explains least privilege for that file. Hints and worked steps are available; viewing steps counts as an attempt, not a correct answer.
-- **Spot the Scam teaches checks, not fear:** compare the real domain, notice urgency, never send passwords or bank details, open known sites yourself — and recognise that a routine notice from the known domain is fine.
-- **Measurable growth.** Each pack has a 6-question pre-check and a *different* 6-question post-check on the same concepts, with before/after scores. *Caveat:* 6 items are indicative, not a validated assessment.
-- **Any subject.** The fractions pack (OpenStax-aligned, procedurally generated, 9,000-problem correctness sweep) and the teacher builder show the player isn't tied to one topic.
-
-### 3. Inclusive Experience
-
-**Design features**
-- Semantic HTML, one `h1` per view, focus moved to each new heading, a skip link as the first Tab stop, labelled fieldsets for every radio group (including each role in the access grid), and live regions for feedback.
-- Full keyboard use, a visible 3 px focus ring, and 44 px targets.
-- Text size (100/125/150%), high contrast, plain language for every instruction, hint and explanation, and read-aloud (speech language follows the UI language).
-- **Spanish:** all UI strings, plus full Spanish versions of Permission to Learn and Spot the Scam. The language switcher sets `<html lang="es">` and its own `lang`, so screen readers switch pronunciation. The fractions problems stay in English, and the app says so.
-- Fictional-content badges on every message and file, so nothing looks like a real email or a real student's data.
-- Low bandwidth: no frameworks, web fonts, trackers or third-party requests. Packs, the builder, fractions and QR code are lazy chunks, all precached for offline use.
-
-**Testing evidence (honest)** — recorded Nov 12, 2026 against the production build in headless Google Chrome:
-- **axe-core (WCAG 2.0/2.1/2.2 A & AA + best practices): 0 violations in 20 scans** — 9 views (home, pre-check, 403 intro, access practice + hint, access feedback, group project, resume code, end session, about) in default and high-contrast + extra-large + plain-language modes, plus the Spanish home and the teacher builder. `docs/reports/axe-results.json`.
-- **Lighthouse 13.6:** Accessibility **100**, Performance **100**, Best Practices **100**, SEO **100** on mobile and desktop. Mobile FCP/LCP 1.1 s, TBT 0 ms, CLS 0. `docs/reports/lighthouse-*.report.html`.
-- **Keyboard-only e2e:** pre-check, the 403 intro, setting roster permissions with arrow keys, a wrong answer, a hint, a correct answer, the resume code, and restoring it in a fresh browser.
-- **Caught during this build:** axe flagged two regions with the same name on the 403 screen (fixed), and the access grid's first test run showed duplicated feedback text (fixed).
-- **Not yet done:** no testing with a real screen reader (NVDA, VoiceOver, TalkBack), on real low-end hardware, or in Safari/iOS, and no testing with students or native Spanish speakers. See [`docs/manual-test-checklist.md`](docs/manual-test-checklist.md). Automated tools cannot certify WCAG conformance, and **no conformance claim is made**.
-
-### 4. Working Prototype & Explanation
-
-- **It runs:** `npm install && npm run build && npm run preview`, then open http://localhost:4173. Screenshots (desktop 1280×800 and mobile 360×740) are in `docs/screenshots/`.
-- **Tests:** 30 unit tests (Vitest) and 13 end-to-end tests (Playwright), all passing; 3 more Playwright tests regenerate screenshots on demand.
-
-**How it works**
-- **Packs** (`src/pack.ts`, `src/packs/*`): typed data — skills, intro, pre/post items, practice items (`choice`, `access`, or `message`), hints, steps, explanations, flags — each string with `std`/`plain` and optional `es`. `validatePack()` checks imported/teacher packs. Built-in packs are lazy `import()` chunks.
-- **Grading** (`src/grade.ts`): choices by id; access grids per role, reporting *too open* / *too tight*.
-- **Resume code** (`src/resume.ts`, v2): 3-bit version, **10-bit pack hash**, 14-bit seed, stage, pre/post counts and bitmasks, per-skill counters and hints = 80 bits, plus a 10-bit CRC → 18 Crockford base32 characters. CRC-10 catches every single wrong character and every swap of neighbours (tested exhaustively). **It is a checksum, not a signature**: it does not stop deliberate forgery, and the app says so. A code for a teacher pack restores only if that pack is loaded.
-- **Builder** (`src/builder.ts`): builds a pack, shows JSON bytes and share-link length, exports/imports JSON, and prints a QR handout with the pack base64url-encoded in `#p=…`. Above ~2,500 characters it refuses the QR and recommends sharing the file.
-- **Storage / offline:** sessionStorage by default, localStorage only on opt-in; a post-build script precaches every built file in a versioned service worker. Strict CSP (`default-src 'self'`).
+- **Digital Survival Curriculum (core):** **Permission to Learn** (a 403 explanation and a least-privilege file-access exercise) and **Spot the Scam** (fictional student messages, `.example` domains, clearly badged as fiction).
+- **Everyday Fractions: Bilingual Teacher Pack Demo:** shows that a teacher can hand out offline homework with a printed QR code and no student accounts. Generated practice is fully bilingual.
+- **Every pack:** a **2-item baseline pre-check**, interactive practice, and a **2-item isomorphic post-check** (same concept, new surface details), then a **Before/After Mastery** card with the delta and a completion code.
+- **Teacher pack builder** (lazy, no backend): multiple-choice questions, optional Spanish fields, a pre/practice/post tag, a live byte counter, JSON export/import, a printable QR handout (`#p=` in the hash, with a size warning), and **Teacher Verify**, which decodes pack id and pre/post scores from the checksummed code, with zero PII. The UI says the checksum catches typos but is not forgery-proof.
+- **No account. Works offline after one load. Leave-no-trace by default.** A live storage badge measures localStorage, sessionStorage, IndexedDB and caches. In leave-no-trace mode it reports **0 bytes** of progress in persistent stores; the open tab may hold a few hundred bytes until it closes; the service-worker **app-shell cache is for offline use and stores no progress**. **Wipe session** and a documented **double-Escape** shortcut open an announced confirmation before anything is deleted.
+- **Resume / completion code + QR.** An 18-character code restores progress **and the pack** on any device.
+- **Accessible and bilingual.** Keyboard-only, focus moved to the new step heading on each view, `aria-live="polite"` feedback, text size, high contrast, plain language, read-aloud, and a language switcher that sets `document.documentElement.lang`. Mixed-language content (for example “403 Forbidden” and `.example` addresses) is marked with `lang`.
 
 ---
-
-## Tools
-
-TypeScript, Vite 6, vanilla DOM; [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (MIT); Service Worker, Cache Storage, Web Speech API, Web Storage, IndexedDB (only to delete leftovers); Vitest, Playwright, @axe-core/playwright, Lighthouse 13.6. AI assistance: Grok Bot (see disclosure). Hosting planned on Vercel (`vercel.json` included), not yet deployed.
 
 ## Setup
 
 ```bash
 npm install
-npm run dev          # dev server (service worker disabled in dev)
-npm run build        # type-check + build + generate dist/sw.js
-npm run preview      # serve dist/ at http://localhost:4173
-npm test                                      # unit tests
-npm run build && npx playwright test          # e2e, axe, throttling
-SCREENSHOTS=1 npx playwright test screenshots # regenerate docs/screenshots
+npm run dev
+npm run build
+npm run preview          # http://localhost:4173
+npm test                 # unit tests
+npm run build && npx playwright test
+SCREENSHOTS=1 npx playwright test screenshots
 ```
 
-**Bundle (gzip):** first load = `index.html` 1.0 KB + `style.css` 2.4 KB + `index.js` 25.2 KB ≈ **28.5 KB** (Lighthouse: 30 KiB transferred including manifest and icon). Lazy chunks, all precached: Permission to Learn 11.8 KB, Spot the Scam 12.3 KB, builder 3.0 KB, fractions 2.9 KB + 0.8 KB, QR 7.8 KB. Whole `dist/` ≈ 75 KB gzipped.
-
-## Challenges
-
-- **Pack size vs. first load.** Bilingual packs with plain-language variants are big (~12 KB gzipped each), so they are lazy chunks; the first load grew from ~15 KB to ~28 KB gzipped, which still scores 100 on mobile Lighthouse.
-- **Fitting a pack into the resume code.** The code had no spare bits, so version 2 shrank the seed to 14 bits and the counters to 4/5 bits to make room for a 10-bit pack hash, keeping 18 characters and the same checksum guarantees.
-- **A QR that holds a whole lesson.** A few short questions fit in a scannable link; a big pack doesn't. The builder shows live JSON and URL sizes and switches from "fits" to "dense" to "too large — share the file".
-- **Keyboard behaviour of radio groups.** The access grid is many radio groups; Tab reaches each group and arrow keys change the choice. The tests drive exactly that.
-- **Fictional but realistic scam examples** that teach without looking like a real email: every one is badged as fictional and uses `.example` domains.
-
-## What I learned
-
-- A content-pack format makes "offline, no account" reusable for any subject, and keeps lessons reviewable as plain data.
-- Feedback that says *how* an answer is wrong (too open vs. too tight) teaches more than "incorrect".
-- Translation is more than strings: `lang` attributes, speech language, and saying plainly when content is not translated.
-- Automated accessibility checks are a baseline. They caught a duplicate landmark, but only real assistive-technology testing will show the rest.
+**Bundle (gzip):** first load = `index.html` 1.05 KB + `style.css` 2.83 KB + `index.js` 27.22 KB ≈ **31.1 KB**. Lighthouse reports 33 KiB transferred including the manifest and icon. Lazy precached chunks: Permission 11.8 KB, Spot the Scam 12.3 KB, builder 5.2 KB, fractions 4.0 + 1.0 KB, QR 7.9 KB.
 
 ## Limitations
 
-- Three packs; Spanish covers the UI, Permission to Learn and Spot the Scam, not fractions. The Spanish has not been reviewed by a native speaker.
-- Teacher-built packs are multiple choice only (no access grids or message cards in the builder yet) and English only.
-- Resume codes catch typos but **are not forgery-proof**. A code for a custom pack only restores on a device where that pack is loaded.
-- Pre/post checks are 6 items, indicative only. Results for these packs are illustrative; no student testing has happened.
-- QR handouts work only for small packs. A teacher pack in the URL hash is readable by anyone with the link (it should never contain student data).
-- Leave-no-trace can't erase browser history or OS-level logs. A QR link works offline only on a device that has loaded the app once.
-- **Not yet tested** with real screen readers, on real low-end devices, or in Safari/iOS.
-
-## Deploying (not done yet)
-
-Fully static. Once approved: push to GitHub, import into Vercel (`vercel.json` sets the build, `dist` output, caching and security headers), then re-run Lighthouse and the offline check on the live URL. QR codes use `location.origin`, so they will point at the deployed site automatically.
+- Teacher-built packs are multiple choice only (no access grids or message cards in the builder) ; Spanish in the builder is optional and only included when the author fills it in.
+- Resume / completion codes catch typos but **are not forgery-proof**. A code for a custom pack restores only on a device where that pack is loaded.
+- Pre/post checks are 2 items, indicative of immediate transfer only.
+- QR handouts work only for small packs. A pack in the URL hash is readable by anyone with the link and must never contain student data.
+- Leave-no-trace cannot erase browser history or OS-level logs. A QR or resume link works offline only on a device that has loaded the app (and that pack) once.
+- Spanish has not been reviewed by a native speaker. Real screen readers, Safari/iOS, and physical devices are still TODO.
 
 ## Credits, AI disclosure, and pre-existing work
 
 - **Fractions content:** topics follow *Prealgebra 2e*, Chapter 4, by Lynn Marecek, MaryAnne Anthony-Smith and Andrea Honeycutt Mathis, © OpenStax / Rice University, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), <https://openstax.org/details/books/prealgebra-2e>. No OpenStax text was copied; problems are generated.
-- **Permission to Learn and Spot the Scam:** original. All names (e.g. "Ms. Rivera", "Lincoln Middle School"), files, messages and domains are fictional. No real student data is used.
+- **Permission to Learn and Spot the Scam:** original. All names, files, messages and domains are fictional.
 - **Statistic:** Pew Research Center, Anderson & Perrin, Oct 26, 2018, <https://www.pewresearch.org/short-reads/2018/10/26/nearly-one-in-five-teens-cant-always-finish-their-homework-because-of-the-digital-divide/>.
 - **Libraries:** qrcode-generator (MIT). Dev-only: Vite, TypeScript, Vitest, Playwright, @axe-core/playwright (MPL-2.0), Lighthouse, serve.
-- **AI disclosure:** most of the code, tests, lesson text, Spanish translation and documentation were drafted by an AI assistant (Grok Bot) at Tejas Chaudhari's direction. Tejas chose the problem, users, direction and constraints, and reviews the work. Commits by the assistant are authored as "Grok Bot (AI assistant for Tejas Chaudhari)".
+- **AI disclosure:** see [AI Attribution](#ai-attribution) above.
 - **Pre-existing work:** none. **Team:** Tejas Chaudhari (solo).

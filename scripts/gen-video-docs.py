@@ -4,24 +4,16 @@ so narration and captions always match. Run: python3 scripts/gen-video-docs.py""
 import re, textwrap
 
 SCENES = [
- (0, 12, "Title card: \"ShareSafe Practice\" + pitch line. Then cut to a library-style desktop browser on the home screen, with the three packs visible.",
-  "Seventeen percent of U.S. teens say they often or sometimes can't finish homework because they lack reliable computer or internet access. That's from Pew Research Center, 2018."),
- (12, 28, "Home screen. Point to the pack picker (Permission to Learn, Spot the Scam, Fractions), the privacy card, and the unchecked \"Save progress on this device\" box.",
-  "ShareSafe Practice is digital-safety lessons for students like Maya, a seventh grader on a library computer with an old phone at home. No account, no name, and nothing saved after she closes the tab, unless she chooses to."),
- (28, 42, "Press Tab: the skip link appears. Keep tabbing to Permission to Learn and \"Start the pre-check\", then press Enter. Answer one question with the keyboard. Show the progress bar.",
-  "Everything works from the keyboard. She picks Permission to Learn and starts a six-question pre-check. No hints here, it just shows where she begins."),
- (42, 70, "403 intro: the mock 403 screen, then the plain-language explanation. Continue to access practice on the class roster. Choose a too-open setting, show \"Not quite\" and the too-open note, open a hint, then answer correctly.",
-  "The lesson opens on a confusing 403 Forbidden screen, then explains it in plain language. Then she practises least privilege: who can view or edit a class roster. If she grants too much access, the feedback says so."),
- (70, 88, "Toggle Text size to Extra large, turn on High contrast, then Plain language. Press the language switcher: the UI and lesson switch to Spanish, and the html lang attribute changes. Switch back to English. Optionally press \"Read aloud\".",
-  "Students can make the text bigger, switch to high contrast, or turn on plain language. A language switcher sets Spanish, including the lesson, and updates the page language so a screen reader switches too."),
- (88, 108, "Turn the toggles back off. Open \"Resume code\": show the 18-character code and the QR. Scan it with a real phone; the phone shows \"Progress restored\" and the same pack.",
-  "Before leaving the library, Maya gets her resume code, or scans the QR with her phone. It carries her progress and which pack she was in, with no account and no server. The last two characters catch typos, not forgery, and the app says so honestly."),
- (108, 122, "On the phone: switch on airplane mode, reload, and show the \"You are offline\" banner. Continue the next file or question in the same pack.",
-  "The first load is about twenty-eight kilobytes, and packs are cached after one visit. So at home, with no internet, it still works."),
- (122, 135, "Back on the library PC: press \"End session\", tick \"Also remove the offline copy\", confirm. Show the \"Session ended\" screen listing what was wiped.",
-  "On the shared computer, End session wipes everything the app stored, including the offline copy if she wants, and confirms what it removed."),
- (135, 150, "Phone: the results screen \"Before 2/6 → After 5/6 (+3)\". Brief cut to the teacher pack builder with the byte counter and a printed QR handout. Then an end card: Lighthouse 100 ×4, 0 axe violations, 43 tests passing, English and Spanish, [DEMO_URL] / [REPO_URL].",
-  "Then the post-check shows her growth. Teachers can build a pack, watch the byte count, and print a QR handout. Lighthouse scores a hundred in every category, axe finds no violations, and real screen reader testing is next. ShareSafe Practice."),
+ (0, 22, "Title card: \"ShareSafe Practice\" + pitch line. Cut to a simulated library-PC browser on the home screen, with Digital Survival Curriculum and the Everyday Fractions teacher-pack demo visible. No presenter or bio on screen.",
+  "Seventeen percent of U.S. teens say they often or sometimes can't finish homework because they lack reliable computer or internet access. That's Pew Research Center, 2018. Many of those students work on shared library computers, public Wi-Fi, or throttled phones, where creating an account is a privacy risk and a dropped signal wipes the work."),
+ (22, 58, "Permission to Learn: miss a 2-item pre-check (show 0/2). Continue to the mock 403, then the class-roster access exercise. Take the 2-item isomorphic post-check (same ideas, new details). Hold on the Before/After Mastery card, Before 0/2 → After 2/2 (+2), and the completion code.",
+  "Maya starts Permission to Learn with no login. She misses a two-question pre-check about a 403 error. The lesson explains the 403, then she practises least privilege on a class roster. A new two-question post-check asks the same ideas with different details. The Before/After Mastery card shows her growth, and says this is immediate transfer, not long-term retention."),
+ (58, 90, "Copy the 18-character code. Point to the storage badge: 0 bytes of progress on the device; the app-shell cache stores no progress. Press Wipe session, or Escape twice, confirm, and show the session-ended screen. Cut to a phone in airplane mode: enter the code; the same pack restores offline.",
+  "She copies an 18-character completion code. Leave-no-trace mode stores zero bytes of progress on the device. Wipe session, or Escape twice, clears the tab and confirms. On her phone, in airplane mode, she enters the code and the same pack comes back offline."),
+ (90, 118, "Toggle English to Spanish. Show Everyday Fractions in Spanish (html lang=es). If, and only if, a real VoiceOver or NVDA clip has been recorded, play 8–10 seconds of it reading the Spanish interface. Then flash the Honest Testing Matrix: automated scores, emulated keyboard and 320px checks, and the manual tests still to do.",
+  "A language switcher sets Spanish, including Everyday Fractions, and updates the page language so a screen reader can switch voices. Our honest testing matrix lists automated scores, emulated keyboard and zoom checks, and the manual tests still to do, including real screen readers."),
+ (118, 145, "Teacher pack builder: add one short multiple-choice question, show the live byte counter, print the QR handout. Scan it with a phone camera; the pack loads with no backend. Paste the student completion code into Teacher Verify; pack name and pre/post scores appear, with the typo-versus-forgery note. End card: Lighthouse 100 ×4, 0 axe violations, [DEMO_URL] / [REPO_URL].",
+  "A teacher writes a short question, watches the byte count, and prints a QR handout. Scanning the code loads the pack with no backend. Pasting the student code into Teacher Verify shows the pack and the pre and post scores. The checksum catches typos; it is not forgery-proof. ShareSafe Practice."),
 ]
 
 def ts(sec, srt=True):
@@ -48,18 +40,18 @@ for start, end, _, narr in SCENES:
 open('docs/demo-video-captions.srt', 'w').write("\n".join(srt))
 
 wc = sum(len(s[3].split()) for s in SCENES)
-md = [f"""# ShareSafe Practice: demo video script (2:30)
+md = [f"""# ShareSafe Practice: demo video script (2:25)
 
-Target length **2:30** · about {wc} words of narration (about {round(wc/2.5)} words per minute, an unhurried pace) · captions: [`demo-video-captions.srt`](demo-video-captions.srt) (generated from this script by `scripts/gen-video-docs.py`, so they match word for word).
+Target length **2:25** · about {wc} words of narration (about {round(wc/2.42)} words per minute) · captions: [`demo-video-captions.srt`](demo-video-captions.srt) (generated from this script by `scripts/gen-video-docs.py`, so they match word for word).
 
 **Before recording**
-- Run `npm run build && npm run preview`, or use the deployed [DEMO_URL]. Clear site data first so you start from the home screen, in English, with default display settings.
-- Set the browser zoom to 100% and the window to about 1280×800, and hide bookmarks.
-- Have an Android phone on the same Wi-Fi to scan the QR. On localhost the QR points to `localhost`, which a phone can't open, so either record the phone part against the deployed URL, or open the LAN address (`http://<your-ip>:4173`) on the PC so the QR encodes it. The service worker needs HTTPS or localhost, so use the deployed URL for the phone offline segment.
-- Turn on system text-to-speech if you include the read-aloud moment.
-- Keep the scenario consistent: use **Permission to Learn**, get 2 of 6 right in the pre-check and 5 of 6 in the post-check, so the end screen shows +3. Those scores are illustrative.
-- For the builder cutaway, have a short valid pack ready so the byte counter and QR handout are visible.
-- Only claim what's true. No real-student testing, no real screen-reader testing, and no native-speaker review of the Spanish has happened yet, so don't imply they have.
+- Run `npm run build && npm run preview`, or use the deployed [DEMO_URL]. Clear site data first so you start from the home screen, in English, with default display settings. Record in clean 1080p at about 125% browser zoom so UI text is legible.
+- Set the window to about 1280×800 and hide bookmarks.
+- Have a phone on the same Wi-Fi to scan the QR. On localhost the QR points to `localhost`, which a phone can't open, so record the phone parts against the deployed URL, or open the LAN address (`http://<your-ip>:4173`) on the PC. The service worker needs HTTPS or localhost, so use the deployed URL for the airplane-mode segment.
+- Keep the scenario consistent: **Permission to Learn**, miss both pre-check items (0/2) and get both post-check items right (2/2), so the mastery card shows +2. Those scores are illustrative of the flow.
+- For the builder cutaway, have a short valid question ready so the byte counter and QR handout are visible.
+- **Screen-reader audio:** include 8–10 seconds of live VoiceOver or NVDA reading the Spanish UI **only if that clip has actually been recorded**. If it has not, show the Spanish UI and the Honest Testing Matrix, and do not imply that a real screen-reader test was filmed.
+- Do not introduce a presenter, a school, or a personal background. Only claim what's true.
 
 | Time | On screen | Narration |
 |---|---|---|"""]
@@ -67,8 +59,8 @@ for start, end, action, narr in SCENES:
     md.append(f"| {ts(start, False)}–{ts(end, False)} | {action} | {narr} |")
 md.append("""
 **Production notes**
-- Capture the screen at 1080p. Show key presses (for example with a keystroke overlay) during the keyboard segment (0:28–0:42).
-- For the phone shots, record the phone screen or film it. Make sure airplane mode is visible at 1:48.
+- Capture the screen at 1080p. Show key presses during the keyboard or Escape-twice moment if it is in the cut.
+- For the phone shots, record the phone screen or film it. Make sure airplane mode is visible in the 0:58–1:30 segment.
 - Add the captions file in the video platform (YouTube: Subtitles → Upload file → With timing).
 - The source is linked in the description: Pew Research Center (2018), https://www.pewresearch.org/short-reads/2018/10/26/nearly-one-in-five-teens-cant-always-finish-their-homework-because-of-the-digital-divide/
 - Keep the final video at 3:00 or shorter. Check the AccessED Hacks rules for the exact limit.

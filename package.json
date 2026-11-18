@@ -1,7 +1,7 @@
 {
   "name": "sharesafe-practice",
   "version": "0.1.0",
-  "description": "Offline-first, privacy-preserving digital-safety lessons for shared and low-end devices.",
+  "description": "Digital Survival Curriculum for shared and low-end devices: no account, offline, private by default. Teachers can hand out a pack with a QR code.",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build && node scripts/gen-sw.mjs",

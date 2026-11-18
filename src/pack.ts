@@ -279,8 +279,11 @@ export function packUrl(origin: string, path: string, pack: Pack): { url: string
   return { url, jsonBytes, urlLength, qr };
 }
 
+export type PackGroup = 'curriculum' | 'demo';
+
 export interface CatalogEntry {
   id: BuiltinId;
+  group: PackGroup;
   title: LText;
   description: LText;
   load: () => Promise<Pack>;
@@ -289,6 +292,7 @@ export interface CatalogEntry {
 export const CATALOG: CatalogEntry[] = [
   {
     id: 'permission',
+    group: 'curriculum',
     title: {
       en: { std: 'Permission to Learn', plain: 'Permission to Learn' },
       es: { std: 'Permiso para aprender', plain: 'Permiso para aprender' },
@@ -307,6 +311,7 @@ export const CATALOG: CatalogEntry[] = [
   },
   {
     id: 'scam',
+    group: 'curriculum',
     title: {
       en: { std: 'Spot the Scam', plain: 'Spot the Scam' },
       es: { std: 'Detecta la estafa', plain: 'Detecta la estafa' },
@@ -325,18 +330,19 @@ export const CATALOG: CatalogEntry[] = [
   },
   {
     id: 'fractions',
+    group: 'demo',
     title: {
-      en: { std: 'Fractions practice', plain: 'Fractions practice' },
-      es: { std: 'Práctica de fracciones', plain: 'Práctica de fracciones' },
+      en: { std: 'Everyday Fractions: Bilingual Teacher Pack Demo', plain: 'Everyday Fractions: a bilingual homework pack' },
+      es: { std: 'Fracciones cotidianas: demostración de pack bilingüe para docentes', plain: 'Fracciones cotidianas: un pack bilingüe de tarea' },
     },
     description: {
       en: {
-        std: 'Equivalent fractions, add and subtract with unlike denominators, and compare. Unlimited generated problems, with hints and worked steps.',
-        plain: 'Practice same-amount fractions, adding and taking away, and which is bigger. You can ask for hints and steps. New problems each time.',
+        std: 'A bilingual teacher-pack demo: equivalent fractions, add and subtract, and compare. Hand out offline homework with a printed QR code. No student accounts.',
+        plain: 'A bilingual demo pack for teachers. Practice fractions and share the pack with a printed QR code. Students do not need an account.',
       },
       es: {
-        std: 'Fracciones equivalentes, sumar y restar con distinto denominador, y comparar. Problemas ilimitados, con pistas y pasos resueltos.',
-        plain: 'Practica fracciones equivalentes, sumar y restar, y cuál es mayor. Puedes pedir pistas y pasos. Hay problemas nuevos cada vez.',
+        std: 'Demostración de pack bilingüe para docentes: fracciones equivalentes, sumar y restar, y comparar. Entrega la tarea sin conexión con un código QR impreso. Sin cuentas de estudiantes.',
+        plain: 'Un pack de demostración bilingüe para docentes. Practica fracciones y compártelo con un código QR impreso. El estudiante no necesita una cuenta.',
       },
     },
     load: () => import('./packs/fractions-pack').then((m) => m.pack),
