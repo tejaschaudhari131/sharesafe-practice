@@ -4,13 +4,13 @@
 
 **AccessED Hacks entry** · Solo entrant: Tejas Chaudhari · Build window **Oct 17 – Nov 20, 2026** · Pre-existing work: **none** (everything in this repo was created during the build window).
 
-Demo: [DEMO_URL] · Video: [VIDEO_URL] · Repo: [REPO_URL]
+Demo: https://sharesafe-practice.vercel.app · Video: [VIDEO_URL] · Repo: https://github.com/tejaschaudhari131/sharesafe-practice
 
 ---
 
 ## 60-second judge tour
 
-Open [DEMO_URL] (or `npm run build && npm run preview`, then http://localhost:4173). No account is needed.
+Open https://sharesafe-practice.vercel.app (or `npm run build && npm run preview`, then http://localhost:4173). No account is needed.
 
 1. **Home (10s).** The page is titled Digital Survival Curriculum. Permission to Learn and Spot the Scam are the core lessons. Everyday Fractions is labeled as a bilingual teacher-pack demo. The footer storage badge should say **0 bytes** of progress on the device.
 2. **Pre-check (10s).** Start Permission to Learn. Miss both 2-item baseline questions (or get them right — either is fine).

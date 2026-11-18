@@ -3,7 +3,7 @@
 Automated checks are already done and reported in the README’s Honest Testing Matrix. **Do not mark any row below as done unless you actually ran it.** Record the result and any bug in the blanks. After a fix, re-test that row and note the date.
 
 **Build / commit:** ____________ (`git rev-parse --short HEAD`)
-**URL:** ☐ local preview `http://localhost:4173` ☐ LAN `http://____________:4173` ☐ deployed [DEMO_URL]
+**URL:** ☐ local preview `http://localhost:4173` ☐ LAN `http://____________:4173` ☐ deployed https://sharesafe-practice.vercel.app
 **Date:** ____________ **Tester:** Tejas Chaudhari
 
 Result key: ✅ pass · ⚠️ works with issues (describe the bug) · ❌ fail · — not tested

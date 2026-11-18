@@ -1,13 +1,13 @@
 # Devpost submission draft: ShareSafe Practice
 
-> Draft for Tejas to review. Nothing has been submitted. Replace [DEMO_URL], [REPO_URL] and [VIDEO_URL] before submitting.
+> Draft for Tejas to review. Nothing has been submitted. Replace [VIDEO_URL] before submitting.
 
 **Project name:** ShareSafe Practice
 
 **Elevator pitch (196 characters):**
 Digital-safety lessons for students on shared library PCs and old phones: no account, works offline, accessible, private by default, in English and Spanish, and teachers can load any pack.
 
-**Links:** Demo: [DEMO_URL] · Code: [REPO_URL] · Video: [VIDEO_URL]
+**Links:** Demo: https://sharesafe-practice.vercel.app · Code: https://github.com/tejaschaudhari131/sharesafe-practice · Video: [VIDEO_URL]
 
 **Built with:** typescript, vite, html5, css3, service-workers, pwa, web-speech-api, indexeddb, qrcode-generator, vitest, playwright, axe-core, lighthouse, vercel
 
